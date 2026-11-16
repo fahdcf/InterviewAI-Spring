@@ -18,8 +18,10 @@ The packaging script creates a Spring Boot JAR and a ZIP containing the desktop 
 - [x] Re-run backend tests on MySQL with `TEST_DB_URL`, `TEST_DB_USER` and `TEST_DB_PASSWORD` set to a disposable database.
 - [x] Load the migrated candidate and administrator views with the JavaFX smoke profile.
 - [x] Start the packaged Spring Boot JAR. Extract and start the Windows desktop application using its bundled runtime.
-- [ ] Register a candidate, sign in, save preferences, generate two courses, complete a chapter, review a missed question, inspect progress and sign out.
-- [ ] Use one synthetic CV to verify a live Gemini job and one synthetic short answer to verify live OpenRouter grading. Record the configured model IDs and outcome while keeping credentials in the backend environment.
+- [x] Exercise the full candidate flow over HTTP on MySQL using local provider fixtures, from registration and course generation through completing a 40-question chapter, reviewing a missed answer, checking XP, and signing out.
+- [x] Send two requests for the same daily quest reward and verify the account receives one award.
+- [ ] Repeat the full candidate flow from the JavaFX application using the deployed backend.
+- [ ] Use one synthetic CV to verify a live Gemini job and test grading and explanations with OpenRouter. Record the configured model IDs and outcome while keeping credentials in the backend environment.
 - [ ] Sign in from a second machine using the deployed API address. The deployment must use HTTPS and secure session cookies.
 - [ ] Sign in as an administrator and verify user, course and analytics actions using the legacy acceptance scenarios.
 - [x] Rehearse upgrading and restoring a synthetic copy of the legacy database. Follow the [upgrade instructions](database-upgrade.md) again with the data selected for cutover.
@@ -33,3 +35,5 @@ The packaging script creates a Spring Boot JAR and a ZIP containing the desktop 
 4. If rollback is needed, stop writes, export the migrated data separately, and return users to the original application and its compatible database. Reconcile new data from the separate export before attempting another cutover.
 
 The README covers required environment variables and development startup. Use a configured single backend process for job recovery.
+
+For a remote deployment, put an HTTPS reverse proxy on the backend host, forward requests to the backend on loopback, and set `SESSION_COOKIE_SECURE=true`. Configure the desktop with the proxy's HTTPS origin using `INTERVIEWAI_API_URL`. Keep the database on persistent storage and configure your service manager to restart the backend after a failure.

@@ -8,13 +8,13 @@ InterviewAI is a desktop interview preparation app. This repository contains the
 | :---: | :---: |
 | <a href="https://github.com/fahdcf"><img src="https://avatars.githubusercontent.com/u/132993312?v=4&amp;s=160" width="80" height="80" alt="Fahd Chafai on GitHub"></a> | <a href="https://github.com/hassan-elkhatoury"><img src="https://avatars.githubusercontent.com/u/128185741?v=4&amp;s=160" width="80" height="80" alt="Hassan El Khatoury on GitHub"></a> |
 
-## Current milestone
+## Features
 
 The JavaFX client supports registration, sign-in, sign-out, course browsing, chapter selection, XP and streaks. **Interview preferences** saves interview details and an optional PDF, DOCX, or DOC CV. **Generate courses** starts a background job that produces one technical and one soft-skills course. **Generation status** reopens progress after leaving the waiting screen. The backend saves both courses together after validating every chapter and question.
 
-Open a lesson from a selected chapter to practice multiple-choice and short-answer questions. **Review this chapter** and **Review this course** show incorrect questions. The backend grades multiple-choice answers locally and uses OpenRouter to grade short answers. Feedback and explanations are displayed after an attempt. A passing lesson answer earns 10 XP once per question. Review updates question status.
+Open a lesson from a selected chapter to practice multiple-choice and short-answer questions. **Review this chapter** and **Review this course** show incorrect questions. The backend grades multiple-choice answers locally and uses OpenRouter to grade short answers. **Explain answer** opens an explanation after grading. A passing lesson answer earns 10 XP once per question. Review updates question status.
 
-**Progress and quests** displays the seven-day XP chart, estimated practice time, goals, and leaderboard. A daily reward grants 900 XP after 20 answers and starts a new progress cycle. The monthly reward grants 30,000 XP after 12 completed chapters. The backend checks and awards each reward in one transaction. Set `APP_TIME_ZONE` to change the calendar used for streaks and quests. It defaults to `Africa/Casablanca`.
+**Progress and quests** displays the seven-day XP chart, estimated practice time, editable goals, leaderboard, and quest countdowns. A daily reward grants 900 XP after 20 answers and starts a new progress cycle. The monthly reward grants 30,000 XP after 12 completed chapters. The backend checks and awards each reward in one transaction. Set `APP_TIME_ZONE` to change the calendar used for streaks and quests. It defaults to `Africa/Casablanca`.
 
 **Profile** lets candidates and administrators change their username and password. Changing a password ends existing sessions. Candidates can delete their own account after confirming the password.
 
@@ -69,7 +69,14 @@ WHERE u.username = 'your-registered-username' AND r.name = 'SUPER_ADMIN';
 
 The backend sends interview preferences and up to 4,000 characters of saved CV text to Gemini for generation. You can remove the saved CV in **Interview preferences**. The default endpoint uses Gemini 3.5 Flash. Set `GEMINI_API_URL` to use a different supported GenerateContent endpoint. Run one backend process per database so it can recover interrupted generation jobs on startup. [Gemini API documentation](https://ai.google.dev/api/generate-content)
 
-Short-answer grading sends the question, expected answer and your answer to OpenRouter. Configure the model with `OPENROUTER_MODEL` and the endpoint with `OPENROUTER_API_URL`. The default model is `openai/gpt-4.1-mini`. [OpenRouter chat completions](https://openrouter.ai/docs/api/api-reference/chat/send-chat-completion-request)
+Short-answer grading and multiple-choice explanations send the question, expected answer and your answer to OpenRouter. Configure the model with `OPENROUTER_MODEL` and the endpoint with `OPENROUTER_API_URL`. The default model is `openai/gpt-4.1-mini`. [OpenRouter chat completions](https://openrouter.ai/docs/api/api-reference/chat/send-chat-completion-request)
+
+## How the two apps work together
+
+- **Sign-in** uses Spring Security to check the account and BCrypt password. JavaFX keeps the session cookie in memory and fetches a CSRF token from the backend before each write.
+- **Course generation** saves a job and returns its ID. JavaFX checks the job for progress while the backend requests and validates both courses. The backend writes the pair together when both are ready.
+- **Answer submission** uses a request ID so retrying the same submission returns the existing attempt. Multiple-choice scores return immediately. JavaFX polls for short-answer grades, and the backend saves the result, progress and any XP together.
+- **Quest claims** lock the candidate's account while checking eligibility and saving the reward. Concurrent requests for the same reward can award XP only once.
 
 ## Verify the build
 
@@ -77,8 +84,10 @@ Short-answer grading sends the question, expected answer and your answer to Open
 .\mvnw.cmd clean verify
 ```
 
-The default test run uses a disposable in-memory database and a local Gemini test server for backend HTTP integration tests. It covers accounts, sessions, course browsing, onboarding, generation, and generation retry. Desktop tests cover connection responses.
+The default test run uses a disposable in-memory database and local Gemini and OpenRouter fixtures. The backend HTTP suite covers accounts, sessions, course generation, lessons, review, progress, quest rewards, and administration. Desktop tests cover connection responses.
 
 To run the backend tests against a separate MySQL database, configure `TEST_DB_URL`, `TEST_DB_USER` and `TEST_DB_PASSWORD`, then run `.\mvnw.cmd -pl backend test`. Use a disposable database since the suite inserts test accounts and changes their roles and status.
 
 Run `.\mvnw.cmd -pl desktop -Pui-tests test` from an interactive desktop to check the JavaFX views. To build the Windows desktop ZIP and runnable backend JAR, run `.\scripts\package-windows.ps1`. See the [migration status](docs/migration-status.md) and [release checklist](docs/release-checklist.md) for verification and remaining release checks.
+
+The Windows verification used Temurin JDK 21.0.11, Spring Boot 3.5.16, JavaFX 21.0.11, and MySQL 8.4.13. Flyway applies migrations through V7.

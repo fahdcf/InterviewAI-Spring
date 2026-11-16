@@ -32,6 +32,8 @@ import java.util.HexFormat;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -331,6 +333,36 @@ class AuthControllerTest {
                 JOIN generated_courses g ON g.id = c.course_id WHERE g.user_id = ?
                 """, Integer.class, userId));
         assertEquals(jobId, json.readTree(get("/course-jobs/latest").body()).path("id").asLong());
+
+        int course = json.readTree(get("/courses").body()).get(0).path("id").asInt();
+        int chapter = json.readTree(get("/courses/" + course + "/chapters").body()).get(0).path("id").asInt();
+        assertEquals(204, saveLocation(course, chapter).statusCode());
+        JsonNode questions = json.readTree(get("/chapters/" + chapter + "/questions").body());
+        assertEquals(40, questions.size());
+        int missedQuestion = questions.get(0).path("id").asInt();
+        JsonNode incorrect = answer(missedQuestion, "LESSON", "Second", UUID.randomUUID().toString(), 200);
+        assertEquals(0, incorrect.path("score").asInt());
+        for (int index = 1; index < questions.size(); index++) {
+            JsonNode question = questions.get(index);
+            boolean multipleChoice = "MULTIPLE_CHOICE".equals(question.path("type").asText());
+            int questionId = question.path("id").asInt();
+            JsonNode answered = answer(questionId, "LESSON", multipleChoice ? "Example" : "mostly correct",
+                    UUID.randomUUID().toString(), multipleChoice ? 200 : 202);
+            if (!multipleChoice) {
+                answered = awaitAttempt(answered);
+            }
+            assertEquals(10, answered.path("xpAwarded").asInt());
+        }
+        JsonNode review = json.readTree(get("/chapters/" + chapter + "/review").body());
+        assertEquals(1, review.size());
+        assertEquals(missedQuestion, review.get(0).path("id").asInt());
+        assertEquals(0, answer(missedQuestion, "REVIEW", "Example", UUID.randomUUID().toString(), 200)
+                .path("xpAwarded").asInt());
+        JsonNode summary = json.readTree(get("/progress").body());
+        assertEquals(390, summary.path("totalXp").asInt());
+        assertEquals(1, summary.path("completedChapters").asInt());
+        assertEquals(204, post("/auth/logout", Map.of(), csrf()).statusCode());
+        assertEquals(401, get("/progress").statusCode());
     }
 
     @Test
@@ -491,10 +523,18 @@ class AuthControllerTest {
         assertTrue(json.readTree(get("/quests").body()).get(0).path("available").asBoolean());
         String daily = "/quests/daily/claims";
         Map<String, String> claim = Map.of("requestId", UUID.randomUUID().toString());
-        HttpResponse<String> first = post(daily, claim, csrf());
-        assertEquals(200, first.statusCode(), first.body());
-        assertEquals(900, json.readTree(first.body()).path("xpAwarded").asInt());
-        assertEquals(200, post(daily, claim, csrf()).statusCode());
+        Map<String, String> otherClaim = Map.of("requestId", UUID.randomUUID().toString());
+        JsonNode token = csrf();
+        CompletableFuture<HttpResponse<String>> pendingClaim = client.sendAsync(
+                writeRequest("POST", daily, claim, token), HttpResponse.BodyHandlers.ofString());
+        HttpResponse<String> second = client.send(writeRequest("POST", daily, otherClaim, token),
+                HttpResponse.BodyHandlers.ofString());
+        HttpResponse<String> first = pendingClaim.get(5, TimeUnit.SECONDS);
+        HttpResponse<String> winner = first.statusCode() == 200 ? first : second;
+        assertEquals(200, winner.statusCode(), winner.body());
+        assertEquals(409, (first.statusCode() == 200 ? second : first).statusCode());
+        assertEquals(900, json.readTree(winner.body()).path("xpAwarded").asInt());
+        assertEquals(200, post(daily, first.statusCode() == 200 ? claim : otherClaim, csrf()).statusCode());
         assertEquals(409, post(daily, Map.of("requestId", UUID.randomUUID().toString()), csrf()).statusCode());
         assertEquals(900, json.readTree(get("/goals").body()).get(0).path("currentValue").asInt());
         int goalId = json.readTree(get("/goals").body()).get(0).path("id").asInt();
@@ -627,13 +667,18 @@ class AuthControllerTest {
 
     private HttpResponse<String> write(String method, String path, Map<String, String> body, JsonNode csrf)
             throws Exception {
+        return client.send(writeRequest(method, path, body, csrf), HttpResponse.BodyHandlers.ofString());
+    }
+
+    private HttpRequest writeRequest(String method, String path, Map<String, String> body, JsonNode csrf)
+            throws Exception {
         HttpRequest.Builder builder = HttpRequest.newBuilder(uri(path))
                 .header("Content-Type", "application/json")
                 .method(method, HttpRequest.BodyPublishers.ofString(json.writeValueAsString(body)));
         if (csrf != null) {
             builder.header(csrf.path("headerName").asText(), csrf.path("token").asText());
         }
-        return client.send(builder.build(), HttpResponse.BodyHandlers.ofString());
+        return builder.build();
     }
 
     @Test
