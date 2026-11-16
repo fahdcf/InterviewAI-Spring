@@ -56,3 +56,7 @@
     -fx-underline: true;
     -fx-cursor: hand;
 }
+
+.progress-chart .chart-title {
+    -fx-text-fill: #f1f5f9;
+}

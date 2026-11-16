@@ -13,6 +13,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDate;
+import java.time.Clock;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -22,10 +23,12 @@ public class DashboardService {
 
     private final CourseRepository courses;
     private final DashboardRepository dashboard;
+    private final Clock clock;
 
-    public DashboardService(CourseRepository courses, DashboardRepository dashboard) {
+    public DashboardService(CourseRepository courses, DashboardRepository dashboard, Clock clock) {
         this.courses = courses;
         this.dashboard = dashboard;
+        this.clock = clock;
     }
 
     @Transactional(readOnly = true)
@@ -39,7 +42,8 @@ public class DashboardService {
         Integer chapterId = findActiveChapter(chapters,
                 courseId != null && courseId.equals(saved.getCourseId()) ? saved.getChapterId() : null);
         return new DashboardResponse(available, pairs, courseId, chapterId, chapters,
-                dashboard.findTotalXp(userId), calculateStreak(dashboard.findActivityDates(userId), LocalDate.now()));
+                dashboard.findTotalXp(userId),
+                calculateStreak(dashboard.findActivityDates(userId, clock.getZone()), LocalDate.now(clock)));
     }
 
     public List<CourseSummary> listCourses(int userId) {

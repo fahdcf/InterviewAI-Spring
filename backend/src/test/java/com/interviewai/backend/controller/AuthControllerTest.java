@@ -460,6 +460,46 @@ class AuthControllerTest {
     }
 
     @Test
+    void goalsUseTheirStartingValueAndQuestClaimsAwardXpOnlyOnce() throws Exception {
+        int userId = registerAndSignIn();
+        int course = insertCourse(userId, "Quest course");
+        int chapter = insertChapter(course, "Test questions");
+        jdbc.update("INSERT INTO progress (user_id, course_id, xp) VALUES (?, ?, 40)", userId, course);
+        HttpResponse<String> goal = post("/goals", Map.of("name", "Earn points", "type", "XP", "target", "100"), csrf());
+        assertEquals(201, goal.statusCode(), goal.body());
+        assertEquals(40, json.readTree(get("/goals").body()).get(0).path("startValue").asInt());
+        for (int count = 1; count <= 20; count++) {
+            jdbc.update("""
+                    INSERT INTO questions (chapter_id, question, status, updated_at)
+                    VALUES (?, ?, 'COMPLETED', CURRENT_TIMESTAMP)
+                    """, chapter, "Question " + count);
+        }
+        jdbc.update("UPDATE users SET daily_quest_last_reset = NULL WHERE id = ?", userId);
+        assertTrue(json.readTree(get("/quests").body()).get(0).path("available").asBoolean());
+        String daily = "/quests/daily/claims";
+        Map<String, String> claim = Map.of("requestId", UUID.randomUUID().toString());
+        HttpResponse<String> first = post(daily, claim, csrf());
+        assertEquals(200, first.statusCode(), first.body());
+        assertEquals(900, json.readTree(first.body()).path("xpAwarded").asInt());
+        assertEquals(200, post(daily, claim, csrf()).statusCode());
+        assertEquals(409, post(daily, Map.of("requestId", UUID.randomUUID().toString()), csrf()).statusCode());
+        assertEquals(900, json.readTree(get("/goals").body()).get(0).path("currentValue").asInt());
+
+        for (int count = 1; count <= 12; count++) {
+            jdbc.update("""
+                    INSERT INTO chapters (course_id, chapter_number, status, completed_at)
+                    VALUES (?, ?, 'COMPLETED', CURRENT_TIMESTAMP)
+                    """, course, count + 1);
+        }
+        String monthly = "/quests/monthly/claims";
+        HttpResponse<String> monthlyResult = post(monthly, Map.of("requestId", UUID.randomUUID().toString()), csrf());
+        assertEquals(200, monthlyResult.statusCode(), monthlyResult.body());
+        assertEquals(409, post(monthly, Map.of("requestId", UUID.randomUUID().toString()), csrf()).statusCode());
+        assertEquals(30940, json.readTree(get("/progress").body()).path("totalXp").asInt());
+        assertEquals(7, json.readTree(get("/progress").body()).path("recentXp").size());
+    }
+
+    @Test
     void dashboardRestoresOnlyAnOwnedCourseAndChapter() throws Exception {
         HttpResponse<String> created = post("/auth/register", registration(""), csrf());
         assertEquals(201, created.statusCode(), created.body());

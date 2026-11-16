@@ -7,6 +7,7 @@ import com.interviewai.desktop.api.DashboardApi;
 import com.interviewai.desktop.api.HealthApi;
 import com.interviewai.desktop.api.OnboardingApi;
 import com.interviewai.desktop.api.PracticeApi;
+import com.interviewai.desktop.api.ProgressApi;
 import com.interviewai.desktop.api.dto.CourseJobStatus;
 import com.interviewai.desktop.feature.auth.AccountController;
 import com.interviewai.desktop.feature.auth.LoginController;
@@ -16,6 +17,7 @@ import com.interviewai.desktop.feature.dashboard.DashboardController;
 import com.interviewai.desktop.feature.onboarding.OnboardingController;
 import com.interviewai.desktop.feature.onboarding.CourseWaitingController;
 import com.interviewai.desktop.feature.practice.PracticeController;
+import com.interviewai.desktop.feature.progress.ProgressController;
 import javafx.fxml.FXMLLoader;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
@@ -34,11 +36,13 @@ public class DesktopNavigator {
     private final OnboardingApi onboardingApi;
     private final CourseJobApi courseJobs;
     private final PracticeApi practice;
+    private final ProgressApi progress;
     private final Executor executor;
     private final String backendAddress;
 
     public DesktopNavigator(Stage stage, AuthApi authApi, HealthApi healthApi, DashboardApi dashboardApi, Executor executor,
-            OnboardingApi onboardingApi, CourseJobApi courseJobs, PracticeApi practice, String backendAddress) {
+            OnboardingApi onboardingApi, CourseJobApi courseJobs, PracticeApi practice, ProgressApi progress,
+            String backendAddress) {
         this.stage = stage;
         this.authApi = authApi;
         this.healthApi = healthApi;
@@ -46,6 +50,7 @@ public class DesktopNavigator {
         this.onboardingApi = onboardingApi;
         this.courseJobs = courseJobs;
         this.practice = practice;
+        this.progress = progress;
         this.executor = executor;
         this.backendAddress = backendAddress;
     }
@@ -81,6 +86,10 @@ public class DesktopNavigator {
     public void showPractice(AccountSummary account, int courseId, Integer chapterId, boolean review) {
         show("practice-view.fxml",
                 new PracticeController(account, practice, this, executor, courseId, chapterId, review));
+    }
+
+    public void showProgress(AccountSummary account) {
+        show("progress-view.fxml", new ProgressController(account, progress, this, executor));
     }
 
     public void showConnection() {

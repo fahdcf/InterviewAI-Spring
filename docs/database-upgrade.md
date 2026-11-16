@@ -27,4 +27,6 @@ New usernames use at most 100 characters and exclude the `@` sign, which keeps t
 
 The upgrade was rehearsed on MySQL 8.4.13 using the pinned legacy SQL and a synthetic account with course, chapter, XP, timestamps, and goal data. V2 preserved the sample data. Signing in by email verified the legacy password and upgraded its hash. Repeat the checks against a copy of your own data before an actual cutover. [Flyway baseline documentation](https://documentation.red-gate.com/flyway/reference/commands/baseline)
 
+V5 adds answer attempt history and V6 records quest claims. The backend uses a UTC MySQL session and applies `APP_TIME_ZONE` to display and count dates. Review legacy `DATETIME` values such as chapter completion and quest resets against their original database timezone during the cutover rehearsal.
+
 For HTTPS deployment, set `SESSION_COOKIE_SECURE=true` on the backend.

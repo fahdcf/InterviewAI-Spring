@@ -100,6 +100,11 @@ public class DashboardController {
     }
 
     @FXML
+    private void openProgress() {
+        navigator.showProgress(account);
+    }
+
+    @FXML
     private void selectCourse() {
         CourseSummary course = coursePicker.getValue();
         if (rendering || current == null || course == null

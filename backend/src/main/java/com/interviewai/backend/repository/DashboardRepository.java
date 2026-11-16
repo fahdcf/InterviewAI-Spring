@@ -5,6 +5,9 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.time.ZoneOffset;
 import java.util.List;
 
 @Repository
@@ -37,11 +40,12 @@ public class DashboardRepository {
                 Long.class, userId);
     }
 
-    public List<LocalDate> findActivityDates(int userId) {
+    public List<LocalDate> findActivityDates(int userId, ZoneId zone) {
         return jdbc.query("""
-                SELECT DISTINCT CAST(last_updated AS DATE) AS activity_date
+                SELECT last_updated
                 FROM progress WHERE user_id = ? AND xp > 0
-                ORDER BY activity_date DESC
-                """, (row, index) -> row.getObject("activity_date", LocalDate.class), userId);
+                ORDER BY last_updated DESC
+                """, (row, index) -> row.getObject("last_updated", LocalDateTime.class)
+                .atOffset(ZoneOffset.UTC).atZoneSameInstant(zone).toLocalDate(), userId).stream().distinct().toList();
     }
 }
