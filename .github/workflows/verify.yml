@@ -39,7 +39,36 @@ jobs:
       - run: ./mvnw -B -ntp clean verify
         env:
           TEST_DB_URL: jdbc:mysql://127.0.0.1:${{ job.services.mysql.ports[3306] }}/interviewai_test?sslMode=DISABLED&allowPublicKeyRetrieval=true
-      - run: xvfb-run -a ./mvnw -B -ntp -pl desktop -Pui-tests test
+      - name: Run JavaFX against the packaged backend
+        env:
+          DB_URL: jdbc:mysql://127.0.0.1:${{ job.services.mysql.ports[3306] }}/interviewai_test?sslMode=DISABLED&allowPublicKeyRetrieval=true
+          DB_USER: interviewai
+          DB_PASSWORD: interviewai_test_only
+          SERVER_PORT: '18080'
+          INTERVIEWAI_API_URL: http://127.0.0.1:18080
+          GEMINI_API_URL: http://127.0.0.1:18586/generate
+          OPENROUTER_API_URL: http://127.0.0.1:18586/grade
+          GEMINI_API_KEY: synthetic-fixture-key
+          OPENROUTER_API_KEY: synthetic-fixture-key
+        run: |
+          ./mvnw -B -ntp -pl backend dependency:build-classpath -Dmdep.outputFile=target/fixture-classpath.txt
+          java -cp "backend/target/test-classes:$(cat backend/target/fixture-classpath.txt)" \
+            com.interviewai.backend.fixture.ProviderFixtures 18586 > provider-fixtures.log 2>&1 &
+          fixture_pid=$!
+          java -jar backend/target/interviewai-backend-0.1.0-SNAPSHOT.jar > backend-journey.log 2>&1 &
+          backend_pid=$!
+          trap 'kill "$backend_pid" "$fixture_pid" 2>/dev/null || true' EXIT
+          for attempt in {1..30}; do
+            if curl --fail --silent "$INTERVIEWAI_API_URL/api/v1/health"; then
+              break
+            fi
+            sleep 1
+          done
+          if ! curl --fail --silent "$INTERVIEWAI_API_URL/api/v1/health"; then
+            cat backend-journey.log provider-fixtures.log
+            exit 1
+          fi
+          xvfb-run -a ./mvnw -B -ntp -pl desktop -Pui-tests -Dinterviewai.journey=true test
 
   windows:
     runs-on: windows-latest

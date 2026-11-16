@@ -15,10 +15,14 @@ import com.sun.net.httpserver.HttpServer;
 import javafx.application.Platform;
 import javafx.scene.Node;
 import javafx.scene.control.Button;
+import javafx.scene.control.ComboBox;
 import javafx.scene.control.Label;
+import javafx.scene.control.ListView;
 import javafx.scene.control.RadioButton;
-import javafx.scene.control.TextField;
+import javafx.scene.control.TextInputControl;
 import javafx.stage.Stage;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 
@@ -28,6 +32,7 @@ import java.net.InetSocketAddress;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.nio.charset.StandardCharsets;
+import java.util.UUID;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -41,6 +46,16 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class DesktopViewsTest {
 
     private Stage stage;
+
+    @BeforeAll
+    static void startJavaFx() {
+        Platform.startup(() -> Platform.setImplicitExit(false));
+    }
+
+    @AfterAll
+    static void stopJavaFx() {
+        Platform.exit();
+    }
 
     @Test
     void candidateAndAdministratorCanOpenTheirScreens() throws Exception {
@@ -64,7 +79,6 @@ class DesktopViewsTest {
         URI baseUrl = URI.create("http://127.0.0.1:" + server.getAddress().getPort());
         try (HttpClient http = HttpClient.newBuilder().cookieHandler(new CookieManager()).build();
                 ExecutorService executor = Executors.newSingleThreadExecutor()) {
-            Platform.startup(() -> Platform.setImplicitExit(false));
             try {
                 onFx(() -> {
                     ApiClient api = new ApiClient(baseUrl, http);
@@ -142,11 +156,120 @@ class DesktopViewsTest {
                     }
                     return null;
                 });
-                Platform.exit();
             }
         } finally {
             server.stop(0);
         }
+    }
+
+    @Test
+    @EnabledIfSystemProperty(named = "interviewai.journey", matches = "true")
+    void candidateCompletesGeneratedChapterAgainstPackagedBackend() throws Exception {
+        assertNotNull(System.getenv("INTERVIEWAI_API_URL"), "Set the disposable backend's origin.");
+        DesktopApplication app = onFx(() -> {
+            DesktopApplication application = new DesktopApplication();
+            stage = new Stage();
+            stage.setOpacity(0);
+            application.start(stage);
+            return application;
+        });
+        try {
+            String username = "desktop-" + UUID.randomUUID().toString().substring(0, 12);
+            press("Create account");
+            fill("#usernameField", username);
+            fill("#passwordField", "synthetic-password");
+            press("Create account");
+            waitForText("#statusLabel", "Account created");
+            signIn(username);
+            waitForText("#xpLabel", "0 XP");
+
+            press("Interview preferences");
+            waitForButton("Generate courses");
+            fill("#context", "Software developer");
+            press("Generate courses");
+            waitFor(() -> node("#coursePicker") instanceof ComboBox<?> picker && picker.getItems().size() == 2,
+                    "both generated courses");
+
+            press("Open lesson");
+            for (int number = 1; number <= 40; number++) {
+                waitForText("#questionLabel", number + " / 40   Question " + number + "?");
+                if (number <= 20) {
+                    chooseAnswer(number == 1 ? "Second" : "Example");
+                } else {
+                    fill("#answer", "mostly correct");
+                }
+                press("Submit answer");
+                waitForText("#status", number == 1 ? "0/100" : "+10 XP");
+                press("Next");
+            }
+            waitForText("#questionLabel", "No more questions in this lesson.");
+            press("Back to dashboard");
+            waitForText("#xpLabel", "390 XP");
+            press("Review this chapter");
+            waitForText("#questionLabel", "1 / 1   Question 1?");
+            chooseAnswer("Example");
+            press("Submit answer");
+            waitForText("#status", "100/100");
+            press("Explain answer");
+            waitForText("#additionalExplanation", "Sample explanation.");
+            press("Back to dashboard");
+            waitForText("#xpLabel", "390 XP");
+
+            press("Progress and quests");
+            waitForText("#summaryLabel", "1 chapters completed");
+            waitForButton("Claim daily reward");
+            press("Claim daily reward");
+            String rewardedXp = String.format("%,d XP", 1290);
+            waitForText("#summaryLabel", rewardedXp);
+            assertTrue(onFx(() -> button("Claim daily reward").isDisabled()));
+
+            fill("#goalName", "Practice daily");
+            fill("#goalTarget", "10");
+            press("Add goal");
+            waitFor(() -> ((ListView<?>) node("#goals")).getItems().size() == 1, "saved goal");
+            onFx(() -> {
+                ((ListView<?>) node("#goals")).getSelectionModel().selectFirst();
+                return null;
+            });
+            fill("#goalName", "Practice weekly");
+            press("Update selected");
+            waitFor(() -> ((ListView<?>) node("#goals")).getItems().getFirst().toString().contains("Practice weekly"),
+                    "updated goal");
+
+            press("Back to dashboard");
+            waitForText("#xpLabel", rewardedXp);
+            press("Sign out");
+            waitForText("#statusLabel", "You signed out.");
+            signIn(username);
+            waitForText("#xpLabel", rewardedXp);
+            waitForText("#chapterName", "Chapter 1");
+            press("Review this chapter");
+            waitForText("#questionLabel", "No more questions to review.");
+        } finally {
+            onFx(() -> {
+                stage.close();
+                app.stop();
+                return null;
+            });
+        }
+    }
+
+    private void chooseAnswer(String answer) throws Exception {
+        onFx(() -> {
+            RadioButton option = node("#choices").lookupAll(".radio-button").stream()
+                    .map(RadioButton.class::cast)
+                    .filter(button -> answer.equals(button.getText()))
+                    .findFirst().orElseThrow(() -> new AssertionError("Choice not found: " + answer));
+            option.fire();
+            return null;
+        });
+    }
+
+    private void fill(String selector, String value) throws Exception {
+        onFx(() -> {
+            ((TextInputControl) node(selector)).setText(value);
+            return null;
+        });
     }
 
     private static String responseBody(String path, String request) throws IOException {
@@ -193,11 +316,8 @@ class DesktopViewsTest {
     }
 
     private void signIn(String username) throws Exception {
-        onFx(() -> {
-            ((TextField) node("#usernameField")).setText(username);
-            ((TextField) node("#passwordField")).setText("synthetic-password");
-            return null;
-        });
+        fill("#usernameField", username);
+        fill("#passwordField", "synthetic-password");
         press("Sign in");
     }
 
@@ -222,7 +342,7 @@ class DesktopViewsTest {
     }
 
     private void waitFor(Callable<Boolean> condition, String expected) throws Exception {
-        for (int attempt = 0; attempt < 60; attempt++) {
+        for (int attempt = 0; attempt < 150; attempt++) {
             if (onFx(condition)) {
                 return;
             }
