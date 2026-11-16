@@ -44,6 +44,8 @@ public class PracticeController {
     @FXML private Button submitButton;
     @FXML private Button nextButton;
     @FXML private Button skipButton;
+    @FXML private Button explainButton;
+    @FXML private Label additionalExplanation;
 
     private List<PracticeQuestion> questions = List.of();
     private int index;
@@ -53,6 +55,7 @@ public class PracticeController {
     private String submittedAnswer;
     private boolean submittedSkip;
     private Long pendingAttempt;
+    private Long gradedAttempt;
 
     public PracticeController(AccountSummary account, PracticeApi api, DesktopNavigator navigator,
             Executor executor, int courseId, Integer chapterId, boolean review) {
@@ -122,6 +125,18 @@ public class PracticeController {
         navigator.showDashboard(account);
     }
 
+    @FXML
+    private void explain() {
+        int questionId = questions.get(index).id();
+        long attemptId = gradedAttempt;
+        String score = status.getText();
+        run("Loading explanation…", () -> api.explain(questionId, attemptId), explanation -> {
+            additionalExplanation.setText(explanation);
+            status.setText(score);
+            updateButtons(false);
+        });
+    }
+
     private void sendAnswer(PracticeQuestion question, String input, boolean skip) {
         if (requestId == null || !input.equals(submittedAnswer) || skip != submittedSkip) {
             requestId = UUID.randomUUID();
@@ -154,10 +169,12 @@ public class PracticeController {
             return;
         }
         complete = true;
+        gradedAttempt = submittedSkip ? null : result.id();
         status.setText(submittedSkip ? "Question skipped."
                 : result.score() + "/100" + (result.xpAwarded() > 0 ? "   +" + result.xpAwarded() + " XP" : ""));
         StringBuilder details = new StringBuilder();
-        for (String section : new String[]{result.strengths(), result.improvements(), result.explanation()}) {
+        String explanation = isMultipleChoice(questions.get(index)) || submittedSkip ? result.explanation() : null;
+        for (String section : new String[]{result.strengths(), result.improvements(), explanation}) {
             if (section != null && !section.isBlank()) {
                 if (!details.isEmpty()) {
                     details.append("\n\n");
@@ -173,6 +190,8 @@ public class PracticeController {
         complete = false;
         requestId = null;
         pendingAttempt = null;
+        gradedAttempt = null;
+        additionalExplanation.setText("");
         answer.clear();
         feedback.setText("");
         choices.getChildren().clear();
@@ -214,6 +233,9 @@ public class PracticeController {
         submitButton.setText(pending ? "Check feedback" : "Submit answer");
         skipButton.setDisable(busy || pending || !hasQuestion || complete);
         nextButton.setDisable(busy || !complete || !hasQuestion);
+        explainButton.setVisible(gradedAttempt != null && additionalExplanation.getText().isEmpty());
+        explainButton.setManaged(explainButton.isVisible());
+        explainButton.setDisable(busy);
         answer.setDisable(busy || pending || complete);
         choices.setDisable(busy || pending || complete);
     }

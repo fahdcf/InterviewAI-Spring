@@ -16,6 +16,7 @@ import javafx.application.Platform;
 import javafx.scene.Node;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
+import javafx.scene.control.RadioButton;
 import javafx.scene.control.TextField;
 import javafx.stage.Stage;
 import org.junit.jupiter.api.Test;
@@ -91,6 +92,19 @@ class DesktopViewsTest {
                 press("Back to dashboard");
                 waitForText("#xpLabel", "25 XP");
 
+                press("Open lesson");
+                waitForText("#questionLabel", "Synthetic question");
+                onFx(() -> {
+                    ((RadioButton) node("#choices").lookup(".radio-button")).fire();
+                    return null;
+                });
+                press("Submit answer");
+                waitForText("#status", "0/100");
+                press("Explain answer");
+                waitForText("#additionalExplanation", "A sample explanation.");
+                press("Back to dashboard");
+                waitForText("#xpLabel", "25 XP");
+
                 press("Review this course");
                 waitForText("#questionLabel", "No more questions to review.");
                 press("Back to dashboard");
@@ -159,6 +173,9 @@ class DesktopViewsTest {
                     """;
             case "/api/v1/questions/1/attempts" -> """
                     {"id":1,"status":"GRADED","score":0,"explanation":"Expected answer: One","xpAwarded":0}
+                    """;
+            case "/api/v1/questions/1/explanations" -> """
+                    {"explanation":"A sample explanation."}
                     """;
             case "/api/v1/courses/1/review", "/api/v1/goals", "/api/v1/quests", "/api/v1/leaderboard" -> "[]";
             case "/api/v1/progress" -> """

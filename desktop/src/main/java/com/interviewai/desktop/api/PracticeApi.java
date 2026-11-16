@@ -4,6 +4,7 @@ import com.interviewai.desktop.api.dto.AttemptResult;
 import com.interviewai.desktop.api.dto.PracticeQuestion;
 
 import java.io.IOException;
+import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -35,5 +36,14 @@ public class PracticeApi {
 
     public AttemptResult attempt(long id) throws IOException, InterruptedException {
         return api.readJson("/api/v1/attempts/" + id, AttemptResult.class);
+    }
+
+    public String explain(int questionId, long attemptId) throws IOException, InterruptedException {
+        Explanation result = api.writeJson("POST", "/api/v1/questions/" + questionId + "/explanations",
+                Map.of("attemptId", attemptId), Explanation.class, Duration.ofSeconds(35));
+        return result.explanation();
+    }
+
+    public record Explanation(String explanation) {
     }
 }

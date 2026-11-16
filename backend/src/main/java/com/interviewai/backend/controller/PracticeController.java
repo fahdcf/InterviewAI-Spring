@@ -7,6 +7,7 @@ import com.interviewai.backend.security.AccountPrincipal;
 import com.interviewai.backend.service.AccountService;
 import com.interviewai.backend.service.PracticeService;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Positive;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -17,6 +18,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/v1")
@@ -55,6 +57,15 @@ public class PracticeController {
             return ResponseEntity.accepted().body(result);
         }
         return ResponseEntity.ok(result);
+    }
+
+    @PostMapping("/questions/{id}/explanations")
+    public Map<String, String> explanation(@AuthenticationPrincipal AccountPrincipal account,
+            @PathVariable int id, @Valid @RequestBody ExplanationRequest request) {
+        return Map.of("explanation", practice.explain(activeUserId(account), id, request.attemptId()));
+    }
+
+    public record ExplanationRequest(@Positive long attemptId) {
     }
 
     @GetMapping("/attempts/{id}")

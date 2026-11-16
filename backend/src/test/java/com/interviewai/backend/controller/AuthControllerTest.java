@@ -95,10 +95,11 @@ class AuthControllerTest {
         provider.createContext("/grade", exchange -> {
             try (exchange) {
                 ObjectMapper json = new ObjectMapper();
-                String userMessage = json.readTree(exchange.getRequestBody())
-                        .path("messages").path(1).path("content").asText();
+                JsonNode request = json.readTree(exchange.getRequestBody());
+                String userMessage = request.path("messages").path(1).path("content").asText();
                 String answer = json.readTree(userMessage).path("candidateAnswer").asText();
-                if ("unavailable".equals(answer)) {
+                boolean explanation = !request.has("response_format");
+                if ("unavailable".equals(answer) || (explanation && "Other".equals(answer))) {
                     exchange.sendResponseHeaders(503, -1);
                     return;
                 }
@@ -108,7 +109,7 @@ class AuthControllerTest {
                         "improvements", "You can add an example.",
                         "explanation", "Sample grade."));
                 byte[] response = json.writeValueAsBytes(Map.of("choices", List.of(
-                        Map.of("message", Map.of("content", grade)))));
+                        Map.of("message", Map.of("content", explanation ? "Sample explanation." : grade)))));
                 exchange.getResponseHeaders().set("Content-Type", "application/json");
                 exchange.sendResponseHeaders(200, response.length);
                 exchange.getResponseBody().write(response);
@@ -395,9 +396,17 @@ class AuthControllerTest {
         JsonNode correct = answer(first, "LESSON", "Expected", request, 200);
         assertEquals(10, correct.path("xpAwarded").asInt());
         assertEquals(correct.path("id"), answer(first, "LESSON", "Expected", request, 200).path("id"));
+        Map<String, String> explanationRequest = Map.of("attemptId", correct.path("id").asText());
+        HttpResponse<String> explained = post("/questions/" + first + "/explanations", explanationRequest, csrf());
+        assertEquals(200, explained.statusCode(), explained.body());
+        assertEquals("Sample explanation.", json.readTree(explained.body()).path("explanation").asText());
+        assertEquals(404, post("/questions/" + second + "/explanations", explanationRequest, csrf()).statusCode());
         assertEquals(0, answer(first, "LESSON", "Expected", UUID.randomUUID().toString(), 200)
                 .path("xpAwarded").asInt());
-        assertEquals(0, answer(second, "LESSON", "Other", UUID.randomUUID().toString(), 200).path("score").asInt());
+        JsonNode incorrect = answer(second, "LESSON", "Other", UUID.randomUUID().toString(), 200);
+        assertEquals(0, incorrect.path("score").asInt());
+        assertEquals(503, post("/questions/" + second + "/explanations",
+                Map.of("attemptId", incorrect.path("id").asText()), csrf()).statusCode());
         assertEquals(1, json.readTree(get("/courses/" + course + "/review").body()).size());
         assertEquals("COMPLETED", jdbc.queryForObject("SELECT status FROM chapters WHERE id = ?", String.class, chapter));
         assertEquals(0, answer(second, "REVIEW", "Expected", UUID.randomUUID().toString(), 200)
@@ -422,6 +431,10 @@ class AuthControllerTest {
         JsonNode passing = awaitAttempt(answer(question, "LESSON", "mostly correct", UUID.randomUUID().toString(), 202));
         assertEquals(70, passing.path("score").asInt());
         assertEquals(10, passing.path("xpAwarded").asInt());
+        HttpResponse<String> explained = post("/questions/" + question + "/explanations",
+                Map.of("attemptId", passing.path("id").asText()), csrf());
+        assertEquals(200, explained.statusCode(), explained.body());
+        assertEquals("Sample grade.", json.readTree(explained.body()).path("explanation").asText());
     }
 
     private int addQuestion(int chapter, String title, String type) {

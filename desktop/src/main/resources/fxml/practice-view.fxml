@@ -20,9 +20,11 @@
             <Button fx:id="submitButton" text="Submit answer" onAction="#submit" styleClass="btn-primary-blue"/>
             <Button fx:id="skipButton" text="Skip" onAction="#skip" styleClass="button-link"/>
             <Button fx:id="nextButton" text="Next" onAction="#next" styleClass="button-link"/>
+            <Button fx:id="explainButton" text="Explain answer" onAction="#explain" styleClass="button-link"/>
             <Button text="Back to dashboard" onAction="#back" styleClass="button-link"/>
         </FlowPane>
         <Label fx:id="status" styleClass="subtitle-dark" wrapText="true"/>
         <Label fx:id="feedback" styleClass="subtitle-dark" wrapText="true"/>
+        <Label fx:id="additionalExplanation" text="" styleClass="subtitle-dark" wrapText="true"/>
     </VBox>
 </ScrollPane>

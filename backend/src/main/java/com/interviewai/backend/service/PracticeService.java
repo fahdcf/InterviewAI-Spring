@@ -3,6 +3,7 @@ package com.interviewai.backend.service;
 import com.interviewai.backend.dto.request.AttemptRequest;
 import com.interviewai.backend.dto.response.AttemptResponse;
 import com.interviewai.backend.dto.response.PracticeQuestionResponse;
+import com.interviewai.backend.integration.ai.OpenRouterGradingClient;
 import com.interviewai.backend.model.AnswerGrade;
 import com.interviewai.backend.model.PracticeAttempt;
 import com.interviewai.backend.model.PracticeQuestion;
@@ -13,6 +14,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -25,11 +27,14 @@ public class PracticeService {
     private final PracticeRepository practice;
     private final CourseRepository courses;
     private final AccountService accounts;
+    private final OpenRouterGradingClient grading;
 
-    public PracticeService(PracticeRepository practice, CourseRepository courses, AccountService accounts) {
+    public PracticeService(PracticeRepository practice, CourseRepository courses, AccountService accounts,
+            OpenRouterGradingClient grading) {
         this.practice = practice;
         this.courses = courses;
         this.accounts = accounts;
+        this.grading = grading;
     }
 
     @Transactional(readOnly = true)
@@ -110,6 +115,27 @@ public class PracticeService {
     public PracticeQuestion findQuestion(int userId, int questionId) {
         return practice.findQuestion(userId, questionId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Question unavailable."));
+    }
+
+    public String explain(int userId, int questionId, long attemptId) {
+        PracticeQuestion question = findQuestion(userId, questionId);
+        PracticeAttempt attempt = practice.findAttempt(userId, attemptId)
+                .filter(saved -> saved.questionId() == questionId && "GRADED".equals(saved.status())
+                        && saved.answer() != null)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Graded answer unavailable."));
+        if ("SHORT_ANSWER".equals(question.type()) && attempt.explanation() != null
+                && !attempt.explanation().isBlank()) {
+            return attempt.explanation();
+        }
+        try {
+            return grading.explain(question, attempt.answer());
+        } catch (InterruptedException interrupted) {
+            Thread.currentThread().interrupt();
+            throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "Explanation interrupted. Try again.");
+        } catch (IOException unavailable) {
+            throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE,
+                    "The explanation service is unavailable. Try again.");
+        }
     }
 
     private void saveGrade(PracticeAttempt attempt, PracticeQuestion question, AnswerGrade grade) {

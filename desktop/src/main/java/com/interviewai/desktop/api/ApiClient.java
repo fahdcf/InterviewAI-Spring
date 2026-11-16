@@ -56,7 +56,13 @@ public class ApiClient {
 
     public <T> T writeJson(String method, String path, Object body, Class<T> responseType)
             throws IOException, InterruptedException {
+        return writeJson(method, path, body, responseType, Duration.ofSeconds(5));
+    }
+
+    public <T> T writeJson(String method, String path, Object body, Class<T> responseType, Duration timeout)
+            throws IOException, InterruptedException {
         HttpRequest request = writeRequest(path)
+                .timeout(timeout)
                 .header("Content-Type", "application/json")
                 .method(method, HttpRequest.BodyPublishers.ofString(objectMapper.writeValueAsString(body)))
                 .build();
@@ -123,7 +129,7 @@ public class ApiClient {
             return response.body();
         }
         String message = "Backend returned HTTP " + status + ".";
-        if (status >= 400 && status < 500) {
+        if ((status >= 400 && status < 500) || status == 503) {
             try {
                 JsonNode details = objectMapper.readTree(response.body());
                 if (details != null) {
