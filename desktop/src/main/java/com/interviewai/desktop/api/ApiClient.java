@@ -39,11 +39,43 @@ public class ApiClient {
                 .GET()
                 .build();
 
-        HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
-        if (response.statusCode() != 200) {
-            throw new IOException("Backend returned HTTP " + response.statusCode() + ".");
-        }
+        return objectMapper.readTree(send(request));
+    }
 
-        return objectMapper.readTree(response.body());
+    public <T> T postJson(String path, Object body, String csrfHeader, String csrfToken, Class<T> responseType)
+            throws IOException, InterruptedException {
+        String requestBody = objectMapper.writeValueAsString(body);
+        HttpRequest request = HttpRequest.newBuilder(baseUrl.resolve(path))
+                .timeout(Duration.ofSeconds(5))
+                .header("Accept", "application/json")
+                .header("Content-Type", "application/json")
+                .header(csrfHeader, csrfToken)
+                .POST(HttpRequest.BodyPublishers.ofString(requestBody))
+                .build();
+        String response = send(request);
+        if (responseType == Void.class) {
+            return null;
+        }
+        return objectMapper.readValue(response, responseType);
+    }
+
+    private String send(HttpRequest request) throws IOException, InterruptedException {
+        HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+        int status = response.statusCode();
+        if (status >= 200 && status < 300) {
+            return response.body();
+        }
+        String message = "Backend returned HTTP " + status + ".";
+        if (status >= 400 && status < 500) {
+            try {
+                JsonNode details = objectMapper.readTree(response.body());
+                if (details != null) {
+                    message = details.path("message").asText(message);
+                }
+            } catch (IOException ignored) {
+                // A proxy can return an HTML error page.
+            }
+        }
+        throw new ApiException(message);
     }
 }

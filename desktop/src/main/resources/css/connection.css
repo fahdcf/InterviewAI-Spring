@@ -35,3 +35,24 @@
 .btn-primary-blue:pressed {
     -fx-background-color: linear-gradient(from 0% 0% to 100% 0%, #047857 0%, #065f46 100%);
 }
+
+.input-dark {
+    -fx-background-color: #1a1f2e;
+    -fx-text-fill: #f1f5f9;
+    -fx-prompt-text-fill: #94a3b8;
+    -fx-background-radius: 10px;
+    -fx-border-radius: 10px;
+    -fx-border-color: #2d3748;
+    -fx-padding: 12px 16px;
+}
+
+.input-dark:focused {
+    -fx-border-color: #10b981;
+}
+
+.button-link {
+    -fx-background-color: transparent;
+    -fx-text-fill: #cbd5e1;
+    -fx-underline: true;
+    -fx-cursor: hand;
+}

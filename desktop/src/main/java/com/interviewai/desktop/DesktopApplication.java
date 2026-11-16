@@ -1,14 +1,15 @@
 package com.interviewai.desktop;
 
 import com.interviewai.desktop.api.ApiClient;
+import com.interviewai.desktop.api.AuthApi;
 import com.interviewai.desktop.api.HealthApi;
-import com.interviewai.desktop.feature.connection.ConnectionController;
+import com.interviewai.desktop.navigation.DesktopNavigator;
 import javafx.application.Application;
-import javafx.fxml.FXMLLoader;
-import javafx.scene.Scene;
 import javafx.scene.control.Alert;
 import javafx.stage.Stage;
 
+import java.net.CookieManager;
+import java.net.CookiePolicy;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.time.Duration;
@@ -21,11 +22,12 @@ public class DesktopApplication extends Application {
 
     private final ExecutorService executor = Executors.newSingleThreadExecutor();
     private final HttpClient httpClient = HttpClient.newBuilder()
+            .cookieHandler(new CookieManager(null, CookiePolicy.ACCEPT_ORIGINAL_SERVER))
             .connectTimeout(Duration.ofSeconds(3))
             .build();
 
     @Override
-    public void start(Stage stage) throws Exception {
+    public void start(Stage stage) {
         String backendAddress = System.getenv("INTERVIEWAI_API_URL");
         if (backendAddress == null || backendAddress.isBlank()) {
             backendAddress = DEFAULT_BACKEND_URL;
@@ -33,9 +35,12 @@ public class DesktopApplication extends Application {
 
         try {
             stage.setTitle("InterviewAI");
-            stage.setScene(createScene(backendAddress));
+            ApiClient apiClient = new ApiClient(URI.create(backendAddress), httpClient);
+            DesktopNavigator navigator = new DesktopNavigator(stage, new AuthApi(apiClient),
+                    new HealthApi(apiClient), executor, backendAddress);
+            navigator.showLogin("");
             stage.setMinWidth(420);
-            stage.setMinHeight(260);
+            stage.setMinHeight(440);
             stage.show();
         } catch (IllegalArgumentException exception) {
             Alert alert = new Alert(Alert.AlertType.ERROR,
@@ -43,21 +48,6 @@ public class DesktopApplication extends Application {
             alert.setHeaderText("Invalid backend address");
             alert.showAndWait();
         }
-    }
-
-    private Scene createScene(String backendAddress) throws Exception {
-        ApiClient apiClient = new ApiClient(URI.create(backendAddress), httpClient);
-        HealthApi healthApi = new HealthApi(apiClient);
-
-        FXMLLoader loader = new FXMLLoader(getClass().getResource("/fxml/connection-view.fxml"));
-        loader.setControllerFactory(controllerType -> {
-            if (controllerType == ConnectionController.class) {
-                return new ConnectionController(healthApi, executor, backendAddress);
-            }
-            throw new IllegalArgumentException("Unknown controller: " + controllerType.getName());
-        });
-
-        return new Scene(loader.load());
     }
 
     @Override

@@ -15,5 +15,6 @@
         <Label fx:id="statusLabel" styleClass="subtitle-dark" wrapText="true"/>
         <Button fx:id="retryButton" text="Check connection" onAction="#checkConnection"
                 styleClass="btn-primary-blue"/>
+        <Button text="Back to sign-in" onAction="#onBack" styleClass="button-link"/>
     </VBox>
 </StackPane>

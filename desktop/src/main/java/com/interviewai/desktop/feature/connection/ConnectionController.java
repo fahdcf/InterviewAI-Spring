@@ -13,6 +13,7 @@ public class ConnectionController {
     private final HealthApi healthApi;
     private final Executor executor;
     private final String backendAddress;
+    private final Runnable openLogin;
 
     @FXML
     private Label addressLabel;
@@ -21,10 +22,16 @@ public class ConnectionController {
     @FXML
     private Button retryButton;
 
-    public ConnectionController(HealthApi healthApi, Executor executor, String backendAddress) {
+    public ConnectionController(HealthApi healthApi, Executor executor, String backendAddress, Runnable openLogin) {
         this.healthApi = healthApi;
         this.executor = executor;
         this.backendAddress = backendAddress;
+        this.openLogin = openLogin;
+    }
+
+    @FXML
+    private void onBack() {
+        openLogin.run();
     }
 
     @FXML
