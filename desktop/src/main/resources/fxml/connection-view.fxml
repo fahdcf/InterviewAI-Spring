@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.scene.control.Button?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.layout.StackPane?>
+<?import javafx.scene.layout.VBox?>
+
+<StackPane xmlns="http://javafx.com/javafx/21"
+           xmlns:fx="http://javafx.com/fxml/1"
+           fx:controller="com.interviewai.desktop.feature.connection.ConnectionController"
+           prefWidth="560" prefHeight="320" styleClass="dark-root" stylesheets="@../css/connection.css">
+    <VBox alignment="CENTER" spacing="14" maxWidth="420" maxHeight="200" styleClass="auth-dark">
+        <Label text="InterviewAI" styleClass="title-dark"/>
+        <Label fx:id="addressLabel" styleClass="subtitle-dark" wrapText="true"/>
+        <Label fx:id="statusLabel" styleClass="subtitle-dark" wrapText="true"/>
+        <Button fx:id="retryButton" text="Check connection" onAction="#checkConnection"
+                styleClass="btn-primary-blue"/>
+    </VBox>
+</StackPane>

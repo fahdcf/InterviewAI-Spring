@@ -1,0 +1,37 @@
+.dark-root {
+    -fx-font-family: "Segoe UI";
+    -fx-font-size: 14px;
+    -fx-background-color: #0f1419;
+}
+
+.auth-dark {
+    -fx-padding: 16px 0 0 0;
+}
+
+.title-dark {
+    -fx-font-size: 28px;
+    -fx-font-weight: 800;
+    -fx-text-fill: #f1f5f9;
+    -fx-padding: 0 0 12px 0;
+}
+
+.subtitle-dark {
+    -fx-font-size: 13px;
+    -fx-text-fill: #94a3b8;
+}
+
+.btn-primary-blue {
+    -fx-background-color: linear-gradient(from 0% 0% to 100% 0%, #10b981 0%, #059669 100%);
+    -fx-text-fill: #ffffff;
+    -fx-font-weight: 600;
+    -fx-background-radius: 10px;
+    -fx-padding: 12px 20px;
+}
+
+.btn-primary-blue:hover {
+    -fx-background-color: linear-gradient(from 0% 0% to 100% 0%, #059669 0%, #047857 100%);
+}
+
+.btn-primary-blue:pressed {
+    -fx-background-color: linear-gradient(from 0% 0% to 100% 0%, #047857 0%, #065f46 100%);
+}
