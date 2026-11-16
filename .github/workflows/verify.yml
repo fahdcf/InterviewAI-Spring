@@ -90,3 +90,26 @@ jobs:
           java-version: '21'
           cache: maven
       - run: .\scripts\package-windows.ps1
+      - uses: actions/upload-artifact@v4
+        with:
+          name: interviewai-windows-build
+          path: |
+            target/distribution-*/InterviewAI-windows.zip
+            target/distribution-*/interviewai-backend-*.jar
+          if-no-files-found: error
+          retention-days: 7
+
+  windows-install:
+    runs-on: windows-latest
+    needs: windows
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: interviewai-windows-build
+          path: packages
+      - name: Launch the downloaded package without Java on PATH
+        run: |
+          $archive = Get-ChildItem packages -Recurse -File -Filter InterviewAI-windows.zip | Select-Object -First 1
+          if (!$archive) { throw 'The build artifact did not contain the desktop ZIP.' }
+          .\scripts\check-windows-package.ps1 -Archive $archive.FullName

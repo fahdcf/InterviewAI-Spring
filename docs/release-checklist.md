@@ -12,12 +12,15 @@ On Windows with JDK 21, run the following from a clean checkout.
 
 The packaging script creates a Spring Boot JAR and a ZIP containing the desktop application and its Java runtime. Extract the full ZIP and run `InterviewAI.exe`. The ZIP's directory layout is required by the launcher. The backend runs with `java -jar` and the database and provider variables in the README. [Java packaging tool](https://docs.oracle.com/en/java/javase/21/docs/specs/man/jpackage.html)
 
+The `Verify` workflow publishes both packages as the `interviewai-windows-build` artifact for seven days. A fresh Windows runner downloads that artifact, extracts the ZIP in a new folder, and checks that the sign-in window opens with the bundled JVM and Java removed from the process PATH.
+
 ## Release acceptance
 
 - [x] Build from a clean checkout and migrate a disposable MySQL schema.
 - [x] Re-run backend tests on MySQL with `TEST_DB_URL`, `TEST_DB_USER` and `TEST_DB_PASSWORD` set to a disposable database.
 - [x] Load the migrated candidate and administrator views with the JavaFX smoke profile.
 - [x] Start the packaged Spring Boot JAR. Extract and start the Windows desktop application using its bundled runtime.
+- [ ] Download and launch the packaged desktop app on the separate Windows runner.
 - [x] Exercise the full candidate flow over HTTP on MySQL using local provider fixtures, from registration and course generation through completing a 40-question chapter, reviewing a missed answer, checking XP, and signing out.
 - [x] Exercise the candidate flow through the JavaFX application against a separate packaged Spring Boot process, MySQL, and local provider fixtures. Verify both generated courses, all 40 answers in the first chapter, missed-answer review, explanations, a daily reward, a saved goal, and progress after signing out and signing back in.
 - [x] Send two requests for the same daily quest reward and verify the account receives one award.
