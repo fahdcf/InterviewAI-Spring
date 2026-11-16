@@ -24,6 +24,8 @@ The packaging script creates a Spring Boot JAR and a ZIP containing the desktop 
 - [ ] Repeat the full candidate flow from the JavaFX application using the deployed backend.
 - [ ] Use one synthetic CV to verify a live Gemini job and test grading and explanations with OpenRouter. Record the configured model IDs and outcome while keeping credentials in the backend environment.
 - [ ] Sign in from a second machine using the deployed API address. The deployment must use HTTPS and secure session cookies.
+- [x] Repeat the candidate journey through a local HTTPS reverse proxy with a certificate trusted by the test JVM. Verify the backend sends a session cookie with the `Secure` attribute.
+- [x] Exercise administration in the migrated JavaFX app against MySQL. Verify analytics, candidate search, email edits, suspension and reactivation, separate XP and progress resets, and course archive, restore, and deletion.
 - [ ] Sign in as an administrator and verify user, course and analytics actions using the legacy acceptance scenarios.
 - [x] Rehearse upgrading and restoring a synthetic copy of the legacy database. Follow the [upgrade instructions](database-upgrade.md) again with the data selected for cutover.
 - [ ] Review the parity gaps listed in the migration status before tagging a stable release.
@@ -37,6 +39,6 @@ The packaging script creates a Spring Boot JAR and a ZIP containing the desktop 
 
 The README covers required environment variables and development startup. Use a configured single backend process for job recovery.
 
-The `Verify` workflow runs the full desktop flow against a disposable backend and starts the same provider fixtures used by the backend integration tests. To run just the desktop tests against a separately started disposable backend, set `INTERVIEWAI_API_URL` to its origin and run `.\mvnw.cmd -pl desktop -Pui-tests "-Dinterviewai.journey=true" test` in an interactive Windows session. The fixture responses provide predictable choices and grades for this scenario.
+The `Verify` workflow runs the full desktop flow against a disposable backend and starts the same provider fixtures used by the backend integration tests. To run just the desktop tests against a separately started disposable backend, set `INTERVIEWAI_API_URL` to its origin and run `.\mvnw.cmd -pl desktop -Pui-tests "-Dinterviewai.journey=true" test` in an interactive Windows session. The fixture responses provide predictable choices and grades for this scenario. To include the administrator steps, provision a synthetic administrator with the password `synthetic-password` on the disposable database and set `INTERVIEWAI_TEST_ADMIN` to that username. The test changes only the candidate and courses created during that run.
 
 For a remote deployment, put an HTTPS reverse proxy on the backend host, forward requests to the backend on loopback, and set `SESSION_COOKIE_SECURE=true`. Configure the desktop with the proxy's HTTPS origin using `INTERVIEWAI_API_URL`. Keep the database on persistent storage and configure your service manager to restart the backend after a failure.

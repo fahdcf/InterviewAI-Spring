@@ -13,14 +13,19 @@ import com.interviewai.desktop.api.ProgressApi;
 import com.interviewai.desktop.navigation.DesktopNavigator;
 import com.sun.net.httpserver.HttpServer;
 import javafx.application.Platform;
+import javafx.event.ActionEvent;
 import javafx.scene.Node;
 import javafx.scene.control.Button;
+import javafx.scene.control.ButtonType;
 import javafx.scene.control.ComboBox;
+import javafx.scene.control.DialogPane;
 import javafx.scene.control.Label;
 import javafx.scene.control.ListView;
 import javafx.scene.control.RadioButton;
+import javafx.scene.control.TabPane;
 import javafx.scene.control.TextInputControl;
 import javafx.stage.Stage;
+import javafx.stage.Window;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -164,7 +169,7 @@ class DesktopViewsTest {
 
     @Test
     @EnabledIfSystemProperty(named = "interviewai.journey", matches = "true")
-    void candidateCompletesGeneratedChapterAgainstPackagedBackend() throws Exception {
+    void desktopJourneyAgainstPackagedBackend() throws Exception {
         assertNotNull(System.getenv("INTERVIEWAI_API_URL"), "Set the disposable backend's origin.");
         DesktopApplication app = onFx(() -> {
             DesktopApplication application = new DesktopApplication();
@@ -245,6 +250,15 @@ class DesktopViewsTest {
             waitForText("#chapterName", "Chapter 1");
             press("Review this chapter");
             waitForText("#questionLabel", "No more questions to review.");
+            press("Back to dashboard");
+            waitForText("#xpLabel", rewardedXp);
+            press("Sign out");
+            waitForText("#statusLabel", "You signed out.");
+
+            String admin = System.getenv("INTERVIEWAI_TEST_ADMIN");
+            if (admin != null) {
+                verifyAdminJourney(admin, username);
+            }
         } finally {
             onFx(() -> {
                 stage.close();
@@ -252,6 +266,102 @@ class DesktopViewsTest {
                 return null;
             });
         }
+    }
+
+    private void verifyAdminJourney(String admin, String candidate) throws Exception {
+        signIn(admin);
+        waitForText("#welcome", "Administration");
+        waitForText("#overview", "Sign-ups");
+
+        selectAdminTab("Users");
+        searchAdmin("#userSearch", candidate);
+        waitForText("#status", "1 users matching");
+        selectFirstItem("#users");
+        waitForText("#userDetails", candidate + " · Active");
+        fill("#userEmail", candidate + "@example.com");
+        press("Save");
+        waitForText("#status", "1 users matching");
+        selectFirstItem("#users");
+        waitFor(() -> ((TextInputControl) node("#userEmail")).getText().equals(candidate + "@example.com"),
+                "saved candidate email");
+
+        confirm("Suspend / activate");
+        waitForText("#status", "1 users matching");
+        selectFirstItem("#users");
+        waitForText("#userDetails", candidate + " · Suspended");
+        confirm("Suspend / activate");
+        waitForText("#status", "1 users matching");
+        selectFirstItem("#users");
+        waitForText("#userDetails", candidate + " · Active");
+
+        confirm("Reset XP");
+        waitForText("#status", "1 users matching");
+        selectFirstItem("#users");
+        waitForText("#userDetails", "0 XP · 2 courses");
+
+        selectAdminTab("Courses");
+        searchAdmin("#courseSearch", candidate);
+        waitForText("#status", "2 courses matching");
+        selectFirstItem("#courses");
+        waitForText("#courseDetails", "Status: ACTIVE");
+        press("Archive / restore");
+        waitForText("#status", "2 courses matching");
+        selectFirstItem("#courses");
+        waitForText("#courseDetails", "Status: ARCHIVED");
+        press("Archive / restore");
+        waitForText("#status", "2 courses matching");
+        selectFirstItem("#courses");
+        waitForText("#courseDetails", "Status: ACTIVE");
+        confirm("Delete course");
+        waitForText("#status", "1 courses matching");
+
+        selectAdminTab("Users");
+        waitForText("#status", "1 users matching");
+        selectFirstItem("#users");
+        confirm("Reset progress");
+        waitForText("#status", "1 users matching");
+        press("Sign out");
+        waitForText("#statusLabel", "You signed out.");
+        signIn(candidate);
+        waitForText("#xpLabel", "0 XP");
+        waitForText("#courseProgress", "0 of 12 chapters completed");
+        waitFor(() -> ((ComboBox<?>) node("#coursePicker")).getItems().size() == 1, "one remaining course");
+    }
+
+    private void selectAdminTab(String name) throws Exception {
+        onFx(() -> {
+            TabPane tabs = (TabPane) node("#tabs");
+            tabs.getTabs().stream().filter(tab -> name.equals(tab.getText()))
+                    .findFirst().ifPresent(tabs.getSelectionModel()::select);
+            return null;
+        });
+    }
+
+    private void searchAdmin(String selector, String search) throws Exception {
+        waitFor(() -> node(selector) != null && !node(selector).isDisabled(), selector);
+        fill(selector, search);
+        onFx(() -> {
+            node(selector).fireEvent(new ActionEvent());
+            return null;
+        });
+    }
+
+    private void selectFirstItem(String selector) throws Exception {
+        onFx(() -> {
+            ((ListView<?>) node(selector)).getSelectionModel().selectFirst();
+            return null;
+        });
+    }
+
+    private void confirm(String action) throws Exception {
+        onFx(() -> {
+            Platform.runLater(() -> Window.getWindows().stream()
+                    .filter(window -> window.isShowing() && window.getScene().getRoot() instanceof DialogPane)
+                    .map(window -> (DialogPane) window.getScene().getRoot())
+                    .findFirst().ifPresent(dialog -> ((Button) dialog.lookupButton(ButtonType.OK)).fire()));
+            button(action).fire();
+            return null;
+        });
     }
 
     private void chooseAnswer(String answer) throws Exception {
@@ -335,10 +445,15 @@ class DesktopViewsTest {
     }
 
     private void waitForText(String selector, String text) throws Exception {
-        waitFor(() -> {
-            Node match = node(selector);
-            return match instanceof Label label && label.getText().contains(text);
-        }, text);
+        try {
+            waitFor(() -> {
+                Node match = node(selector);
+                return match instanceof Label label && label.getText().contains(text);
+            }, text);
+        } catch (AssertionError missing) {
+            String actual = onFx(() -> node(selector) instanceof Label label ? label.getText() : "(no label)");
+            throw new AssertionError(missing.getMessage() + ". " + selector + " showed: " + actual, missing);
+        }
     }
 
     private void waitFor(Callable<Boolean> condition, String expected) throws Exception {
