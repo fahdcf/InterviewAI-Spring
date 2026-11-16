@@ -27,7 +27,6 @@ jobs:
           --health-timeout=5s
           --health-retries=15
     env:
-      TEST_DB_URL: jdbc:mysql://127.0.0.1:${{ job.services.mysql.ports[3306] }}/interviewai_test?sslMode=DISABLED&allowPublicKeyRetrieval=true
       TEST_DB_USER: interviewai
       TEST_DB_PASSWORD: interviewai_test_only
     steps:
@@ -38,6 +37,8 @@ jobs:
           java-version: '21'
           cache: maven
       - run: ./mvnw -B -ntp clean verify
+        env:
+          TEST_DB_URL: jdbc:mysql://127.0.0.1:${{ job.services.mysql.ports[3306] }}/interviewai_test?sslMode=DISABLED&allowPublicKeyRetrieval=true
       - run: xvfb-run -a ./mvnw -B -ntp -pl desktop -Pui-tests test
 
   windows:
