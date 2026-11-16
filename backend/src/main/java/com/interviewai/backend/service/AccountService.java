@@ -44,9 +44,12 @@ public class AccountService {
     public AccountResponse getActiveAccount(int userId) {
         Account account = findActiveAccount(userId);
         List<String> roles = accounts.findRoles(userId);
+        List<String> permissions = accounts.findPermissions(userId);
         boolean administrator = roles.contains("SUPER_ADMIN")
-                || accounts.findPermissions(userId).contains("manage_users");
-        return new AccountResponse(account.getId(), account.getUsername(), account.getEmail(), roles, administrator);
+                || permissions.contains("manage_users") || permissions.contains("manage_courses")
+                || permissions.contains("view_analytics");
+        return new AccountResponse(account.getId(), account.getUsername(), account.getEmail(), roles, permissions,
+                administrator);
     }
 
     public void lockActiveAccount(int userId) {

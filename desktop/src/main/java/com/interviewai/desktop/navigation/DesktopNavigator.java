@@ -1,6 +1,7 @@
 package com.interviewai.desktop.navigation;
 
 import com.interviewai.desktop.api.AccountSummary;
+import com.interviewai.desktop.api.AdminApi;
 import com.interviewai.desktop.api.AuthApi;
 import com.interviewai.desktop.api.CourseJobApi;
 import com.interviewai.desktop.api.DashboardApi;
@@ -10,7 +11,7 @@ import com.interviewai.desktop.api.PracticeApi;
 import com.interviewai.desktop.api.ProgressApi;
 import com.interviewai.desktop.api.ProfileApi;
 import com.interviewai.desktop.api.dto.CourseJobStatus;
-import com.interviewai.desktop.feature.auth.AccountController;
+import com.interviewai.desktop.feature.admin.AdminController;
 import com.interviewai.desktop.feature.auth.LoginController;
 import com.interviewai.desktop.feature.auth.RegisterController;
 import com.interviewai.desktop.feature.connection.ConnectionController;
@@ -40,12 +41,13 @@ public class DesktopNavigator {
     private final PracticeApi practice;
     private final ProgressApi progress;
     private final ProfileApi profile;
+    private final AdminApi admin;
     private final Executor executor;
     private final String backendAddress;
 
     public DesktopNavigator(Stage stage, AuthApi authApi, HealthApi healthApi, DashboardApi dashboardApi, Executor executor,
             OnboardingApi onboardingApi, CourseJobApi courseJobs, PracticeApi practice, ProgressApi progress,
-            ProfileApi profile, String backendAddress) {
+            ProfileApi profile, AdminApi admin, String backendAddress) {
         this.stage = stage;
         this.authApi = authApi;
         this.healthApi = healthApi;
@@ -55,6 +57,7 @@ public class DesktopNavigator {
         this.practice = practice;
         this.progress = progress;
         this.profile = profile;
+        this.admin = admin;
         this.executor = executor;
         this.backendAddress = backendAddress;
     }
@@ -69,7 +72,7 @@ public class DesktopNavigator {
 
     public void showAccount(AccountSummary account) {
         if (account.isAdministrator()) {
-            show("account-view.fxml", new AccountController(authApi, this, executor, account));
+            show("admin-view.fxml", new AdminController(account, admin, authApi, this, executor));
         } else {
             showDashboard(account);
         }

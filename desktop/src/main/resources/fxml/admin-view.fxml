@@ -1,0 +1,106 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.chart.CategoryAxis?>
+<?import javafx.scene.chart.LineChart?>
+<?import javafx.scene.chart.NumberAxis?>
+<?import javafx.scene.chart.PieChart?>
+<?import javafx.scene.control.Button?>
+<?import javafx.scene.control.ComboBox?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.control.ListView?>
+<?import javafx.scene.control.ScrollPane?>
+<?import javafx.scene.control.Tab?>
+<?import javafx.scene.control.TabPane?>
+<?import javafx.scene.control.TextField?>
+<?import javafx.scene.layout.BorderPane?>
+<?import javafx.scene.layout.FlowPane?>
+<?import javafx.scene.layout.VBox?>
+
+<BorderPane fx:id="page" xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1"
+            fx:controller="com.interviewai.desktop.feature.admin.AdminController"
+            stylesheets="@../css/connection.css" styleClass="dark-root">
+    <padding><Insets top="16" right="20" bottom="16" left="20"/></padding>
+    <top>
+        <VBox spacing="6">
+            <Label fx:id="welcome" styleClass="title-dark" wrapText="true"/>
+            <FlowPane hgap="12">
+                <Button text="Refresh" onAction="#refresh" styleClass="button-link"/>
+                <Button text="Profile" onAction="#profile" styleClass="button-link"/>
+                <Button text="Sign out" onAction="#logout" styleClass="button-link"/>
+            </FlowPane>
+            <Label fx:id="status" styleClass="subtitle-dark" wrapText="true"/>
+        </VBox>
+    </top>
+    <center>
+        <TabPane fx:id="tabs" tabClosingPolicy="UNAVAILABLE">
+            <Tab fx:id="overviewTab" text="Overview">
+                <ScrollPane fitToWidth="true">
+                    <VBox spacing="10" styleClass="dark-root">
+                        <padding><Insets top="12" right="12" bottom="12" left="12"/></padding>
+                        <Label fx:id="overview" wrapText="true" styleClass="subtitle-dark"/>
+                        <LineChart fx:id="trends" title="Recent activity" animated="false" prefHeight="230"
+                                   styleClass="progress-chart">
+                            <xAxis><CategoryAxis tickLabelFill="#cbd5e1"/></xAxis>
+                            <yAxis><NumberAxis tickLabelFill="#cbd5e1"/></yAxis>
+                        </LineChart>
+                        <FlowPane hgap="8" vgap="8">
+                            <PieChart fx:id="interviewTypes" title="Interview types" prefWidth="305"
+                                      prefHeight="220" styleClass="progress-chart"/>
+                            <PieChart fx:id="languages" title="Languages" prefWidth="305"
+                                      prefHeight="220" styleClass="progress-chart"/>
+                        </FlowPane>
+                    </VBox>
+                </ScrollPane>
+            </Tab>
+            <Tab fx:id="userTab" text="Users">
+                <ScrollPane fitToWidth="true">
+                    <VBox spacing="10" styleClass="dark-root">
+                        <padding><Insets top="12" right="12" bottom="12" left="12"/></padding>
+                        <FlowPane hgap="8" vgap="8">
+                            <TextField fx:id="userSearch" promptText="Username or email" onAction="#searchUsers"/>
+                            <ComboBox fx:id="statusFilter" promptText="Status"/>
+                            <ComboBox fx:id="roleFilter" promptText="Role"/>
+                            <Button text="Search" onAction="#searchUsers"/>
+                        </FlowPane>
+                        <ListView fx:id="users" prefHeight="180"/>
+                        <FlowPane hgap="8">
+                            <Button fx:id="userPrevious" text="Previous" onAction="#previousUsers"/>
+                            <Button fx:id="userNext" text="Next" onAction="#nextUsers"/>
+                        </FlowPane>
+                        <Label fx:id="userDetails" text="Select a user." styleClass="subtitle-dark" wrapText="true"/>
+                        <FlowPane hgap="8" vgap="8">
+                            <TextField fx:id="userEmail" promptText="User email"/>
+                            <ComboBox fx:id="userRole" promptText="Role"/>
+                            <Button text="Save" onAction="#saveUser"/>
+                            <Button text="Suspend / activate" onAction="#toggleUser"/>
+                            <Button text="Reset XP" onAction="#resetXp"/>
+                            <Button text="Reset progress" onAction="#resetProgress"/>
+                        </FlowPane>
+                    </VBox>
+                </ScrollPane>
+            </Tab>
+            <Tab fx:id="courseTab" text="Courses">
+                <ScrollPane fitToWidth="true">
+                    <VBox spacing="10" styleClass="dark-root">
+                        <padding><Insets top="12" right="12" bottom="12" left="12"/></padding>
+                        <FlowPane hgap="8" vgap="8">
+                            <TextField fx:id="courseSearch" promptText="Course title or owner" onAction="#searchCourses"/>
+                            <ComboBox fx:id="courseFilter" promptText="Status"/>
+                            <Button text="Search" onAction="#searchCourses"/>
+                        </FlowPane>
+                        <ListView fx:id="courses" prefHeight="200"/>
+                        <FlowPane hgap="8">
+                            <Button fx:id="coursePrevious" text="Previous" onAction="#previousCourses"/>
+                            <Button fx:id="courseNext" text="Next" onAction="#nextCourses"/>
+                        </FlowPane>
+                        <Label fx:id="courseDetails" text="Select a course." styleClass="subtitle-dark" wrapText="true"/>
+                        <FlowPane hgap="8" vgap="8">
+                            <Button text="Archive / restore" onAction="#archiveCourse"/>
+                            <Button text="Delete course" onAction="#deleteCourse"/>
+                        </FlowPane>
+                    </VBox>
+                </ScrollPane>
+            </Tab>
+        </TabPane>
+    </center>
+</BorderPane>

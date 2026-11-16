@@ -54,6 +54,10 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST, "/api/v1/auth/login", "/api/v1/auth/register").permitAll()
                         .requestMatchers("/api/v1/admin/users", "/api/v1/admin/users/**")
                         .hasAnyAuthority("ROLE_SUPER_ADMIN", "manage_users")
+                        .requestMatchers("/api/v1/admin/courses", "/api/v1/admin/courses/**")
+                        .hasAnyAuthority("ROLE_SUPER_ADMIN", "manage_courses")
+                        .requestMatchers("/api/v1/admin/overview", "/api/v1/admin/analytics")
+                        .hasAnyAuthority("ROLE_SUPER_ADMIN", "view_analytics")
                         .requestMatchers("/api/v1/admin/**").hasRole("SUPER_ADMIN")
                         .anyRequest().authenticated())
                 .exceptionHandling(errors -> errors

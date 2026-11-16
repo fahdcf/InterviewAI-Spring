@@ -643,6 +643,43 @@ class AuthControllerTest {
         assertEquals(0, jdbc.queryForObject("SELECT COUNT(*) FROM progress WHERE user_id = ?", Integer.class, userId));
     }
 
+    @Test
+    void administratorCanFilterUsersResetProgressAndManageCourses() throws Exception {
+        int adminId = registerAndSignIn();
+        jdbc.update("INSERT INTO user_roles (user_id, role_id) SELECT ?, id FROM roles WHERE name = 'SUPER_ADMIN'",
+                adminId);
+        assertEquals(200, login(username, PASSWORD).statusCode());
+        String candidateName = username + "-managed";
+        jdbc.update("INSERT INTO users (username) VALUES (?)", candidateName);
+        int candidateId = jdbc.queryForObject("SELECT id FROM users WHERE username = ?", Integer.class, candidateName);
+        int courseId = insertCourse(candidateId, "Managed course");
+        int chapterId = insertChapter(courseId, "Managed chapter");
+        jdbc.update("UPDATE chapters SET status = 'COMPLETED' WHERE id = ?", chapterId);
+        jdbc.update("INSERT INTO progress (user_id, course_id, xp) VALUES (?, ?, 50)", candidateId, courseId);
+
+        HttpResponse<String> filtered = get("/admin/users?search=" + candidateName + "&status=ACTIVE");
+        assertEquals(200, filtered.statusCode(), filtered.body());
+        assertEquals(1, json.readTree(filtered.body()).path("total").asInt());
+        String user = "/admin/users/" + candidateId;
+        assertEquals(204, post(user + "/xp-reset", Map.of(), csrf()).statusCode());
+        assertEquals(0, jdbc.queryForObject("SELECT SUM(xp) FROM progress WHERE user_id = ?", Integer.class, candidateId));
+        assertEquals("COMPLETED", jdbc.queryForObject("SELECT status FROM chapters WHERE id = ?", String.class, chapterId));
+        assertEquals(204, post(user + "/progress-reset", Map.of(), csrf()).statusCode());
+        assertEquals("NOT_STARTED", jdbc.queryForObject("SELECT status FROM chapters WHERE id = ?", String.class, chapterId));
+        assertEquals(204, write("PATCH", user, Map.of("active", "false"), csrf()).statusCode());
+        assertEquals(1, json.readTree(get("/admin/users?search=" + candidateName + "&status=SUSPENDED")
+                .body()).path("total").asInt());
+        assertEquals(204, write("PATCH", user, Map.of("active", "true"), csrf()).statusCode());
+        assertEquals(200, get("/admin/overview").statusCode());
+
+        String course = "/admin/courses/" + courseId;
+        assertEquals(204, write("PATCH", course, Map.of("status", "ARCHIVED"), csrf()).statusCode());
+        assertEquals("ARCHIVED", json.readTree(get(course).body()).path("status").asText());
+        assertEquals(204, write("PATCH", course, Map.of("status", "ACTIVE"), csrf()).statusCode());
+        assertEquals(204, write("DELETE", course, Map.of(), csrf()).statusCode());
+        assertEquals(404, get(course).statusCode());
+    }
+
     private URI uri(String path) {
         return URI.create("http://127.0.0.1:" + port + "/api/v1" + path);
     }

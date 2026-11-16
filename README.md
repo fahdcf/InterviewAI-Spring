@@ -18,6 +18,8 @@ Open a lesson from a selected chapter to practice multiple-choice and short-answ
 
 **Profile** lets candidates and administrators change their username and password. Changing a password ends existing sessions. Candidates can delete their own account after confirming the password.
 
+Administrators can review usage and sign-up trends, filter users and courses, manage user access, reset XP or lesson progress, and archive or delete courses. Spring Security checks permissions on each administrative endpoint.
+
 - `backend/` contains the Spring Boot controllers, account service, JDBC repository, security configuration and Flyway migrations.
 - `desktop/` contains the JavaFX screens, controllers and HTTP client.
 - The `legacy-baseline` tag identifies the complete original source snapshot. See the [migration plan](MIGRATION_PLAN.md) and [legacy acceptance checklist](docs/legacy-acceptance.md).
@@ -56,6 +58,14 @@ In a second PowerShell window, launch the desktop in an interactive Windows sess
 The desktop defaults to `http://127.0.0.1:8080`. Set `INTERVIEWAI_API_URL` in the desktop terminal to choose a different server. Use the server origin, including the port if needed. To change the local backend port, set `SERVER_PORT` in the backend terminal.
 
 Choose **Create account**, then sign in with the username or the optional email. New accounts have the candidate role. Imported administrator roles and user-management permissions are recognized at sign-in.
+
+To provision the first administrator in a development database, register the account in the desktop app. In MySQL, assign the existing `SUPER_ADMIN` role to that specific username, then sign in again.
+
+```sql
+INSERT INTO user_roles (user_id, role_id)
+SELECT u.id, r.id FROM users u CROSS JOIN roles r
+WHERE u.username = 'your-registered-username' AND r.name = 'SUPER_ADMIN';
+```
 
 The backend sends interview preferences and up to 4,000 characters of saved CV text to Gemini for generation. You can remove the saved CV in **Interview preferences**. The default endpoint uses Gemini 3.5 Flash. Set `GEMINI_API_URL` to use a different supported GenerateContent endpoint. Run one backend process per database so it can recover interrupted generation jobs on startup. [Gemini API documentation](https://ai.google.dev/api/generate-content)
 
