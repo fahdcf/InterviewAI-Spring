@@ -593,13 +593,54 @@ class AuthControllerTest {
     }
 
     private HttpResponse<String> post(String path, Map<String, String> body, JsonNode csrf) throws Exception {
+        return write("POST", path, body, csrf);
+    }
+
+    private HttpResponse<String> write(String method, String path, Map<String, String> body, JsonNode csrf)
+            throws Exception {
         HttpRequest.Builder builder = HttpRequest.newBuilder(uri(path))
                 .header("Content-Type", "application/json")
-                .POST(HttpRequest.BodyPublishers.ofString(json.writeValueAsString(body)));
+                .method(method, HttpRequest.BodyPublishers.ofString(json.writeValueAsString(body)));
         if (csrf != null) {
             builder.header(csrf.path("headerName").asText(), csrf.path("token").asText());
         }
         return client.send(builder.build(), HttpResponse.BodyHandlers.ofString());
+    }
+
+    @Test
+    void profileChangesInvalidateOtherSessionsAndDeletionRemovesOwnedData() throws Exception {
+        int userId = registerAndSignIn();
+        int course = insertCourse(userId, "Owned course");
+        insertChapter(course, "Owned chapter");
+        jdbc.update("INSERT INTO progress (user_id, course_id, xp) VALUES (?, ?, 10)", userId, course);
+
+        String name = username + "-renamed";
+        HttpResponse<String> updated = write("PATCH", "/me", Map.of("username", name), csrf());
+        assertEquals(200, updated.statusCode(), updated.body());
+        assertEquals(name, json.readTree(get("/me").body()).path("username").asText());
+        CookieManager secondSession = new CookieManager();
+        try (HttpClient secondClient = HttpClient.newBuilder().cookieHandler(secondSession).build()) {
+            HttpClient firstClient = client;
+            client = secondClient;
+            try {
+                assertEquals(200, login(name, PASSWORD).statusCode());
+            } finally {
+                client = firstClient;
+            }
+            String replacement = "synthetic-updated-password";
+            assertEquals(400, write("PUT", "/me/password",
+                    Map.of("currentPassword", "wrong", "newPassword", replacement), csrf()).statusCode());
+            assertEquals(204, write("PUT", "/me/password",
+                    Map.of("currentPassword", PASSWORD, "newPassword", replacement), csrf()).statusCode());
+            HttpRequest secondRequest = HttpRequest.newBuilder(uri("/me")).GET().build();
+            assertEquals(401, secondClient.send(secondRequest, HttpResponse.BodyHandlers.ofString()).statusCode());
+            assertEquals(401, login(name, PASSWORD).statusCode());
+            assertEquals(200, login(name, replacement).statusCode());
+            assertEquals(204, post("/me/account-deletion", Map.of("password", replacement), csrf()).statusCode());
+        }
+        assertEquals(401, get("/me").statusCode());
+        assertEquals(0, jdbc.queryForObject("SELECT COUNT(*) FROM generated_courses WHERE id = ?", Integer.class, course));
+        assertEquals(0, jdbc.queryForObject("SELECT COUNT(*) FROM progress WHERE user_id = ?", Integer.class, userId));
     }
 
     private URI uri(String path) {

@@ -8,6 +8,7 @@ import com.interviewai.desktop.api.HealthApi;
 import com.interviewai.desktop.api.OnboardingApi;
 import com.interviewai.desktop.api.PracticeApi;
 import com.interviewai.desktop.api.ProgressApi;
+import com.interviewai.desktop.api.ProfileApi;
 import com.interviewai.desktop.api.dto.CourseJobStatus;
 import com.interviewai.desktop.feature.auth.AccountController;
 import com.interviewai.desktop.feature.auth.LoginController;
@@ -18,6 +19,7 @@ import com.interviewai.desktop.feature.onboarding.OnboardingController;
 import com.interviewai.desktop.feature.onboarding.CourseWaitingController;
 import com.interviewai.desktop.feature.practice.PracticeController;
 import com.interviewai.desktop.feature.progress.ProgressController;
+import com.interviewai.desktop.feature.profile.ProfileController;
 import javafx.fxml.FXMLLoader;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
@@ -37,12 +39,13 @@ public class DesktopNavigator {
     private final CourseJobApi courseJobs;
     private final PracticeApi practice;
     private final ProgressApi progress;
+    private final ProfileApi profile;
     private final Executor executor;
     private final String backendAddress;
 
     public DesktopNavigator(Stage stage, AuthApi authApi, HealthApi healthApi, DashboardApi dashboardApi, Executor executor,
             OnboardingApi onboardingApi, CourseJobApi courseJobs, PracticeApi practice, ProgressApi progress,
-            String backendAddress) {
+            ProfileApi profile, String backendAddress) {
         this.stage = stage;
         this.authApi = authApi;
         this.healthApi = healthApi;
@@ -51,6 +54,7 @@ public class DesktopNavigator {
         this.courseJobs = courseJobs;
         this.practice = practice;
         this.progress = progress;
+        this.profile = profile;
         this.executor = executor;
         this.backendAddress = backendAddress;
     }
@@ -90,6 +94,10 @@ public class DesktopNavigator {
 
     public void showProgress(AccountSummary account) {
         show("progress-view.fxml", new ProgressController(account, progress, this, executor));
+    }
+
+    public void showProfile(AccountSummary account) {
+        show("profile-view.fxml", new ProfileController(account, profile, this, executor));
     }
 
     public void showConnection() {

@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.Button?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.control.PasswordField?>
+<?import javafx.scene.control.ScrollPane?>
+<?import javafx.scene.control.TextField?>
+<?import javafx.scene.layout.FlowPane?>
+<?import javafx.scene.layout.VBox?>
+
+<ScrollPane fitToWidth="true" xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1"
+            fx:controller="com.interviewai.desktop.feature.profile.ProfileController"
+            stylesheets="@../css/connection.css">
+    <VBox fx:id="form" spacing="12" styleClass="dark-root">
+        <padding><Insets top="24" right="28" bottom="24" left="28"/></padding>
+        <Label text="Your profile" styleClass="title-dark"/>
+        <Label text="Username" styleClass="subtitle-dark"/>
+        <TextField fx:id="username" maxWidth="420" styleClass="input-dark"/>
+        <Button text="Save username" onAction="#rename" styleClass="btn-primary-blue"/>
+        <Label text="Password" styleClass="title-dark"/>
+        <PasswordField fx:id="currentPassword" promptText="Current password" maxWidth="420" styleClass="input-dark"/>
+        <PasswordField fx:id="newPassword" promptText="New password" maxWidth="420" styleClass="input-dark"/>
+        <PasswordField fx:id="confirmPassword" promptText="Confirm new password" maxWidth="420" styleClass="input-dark"/>
+        <FlowPane hgap="10" vgap="8">
+            <Button text="Change password" onAction="#changePassword" styleClass="btn-primary-blue"/>
+            <Button fx:id="deleteButton" text="Delete account" onAction="#delete" styleClass="button-link"/>
+            <Button text="Back" onAction="#back" styleClass="button-link"/>
+        </FlowPane>
+        <Label fx:id="status" styleClass="subtitle-dark" wrapText="true"/>
+    </VBox>
+</ScrollPane>

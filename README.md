@@ -16,6 +16,8 @@ Open a lesson from a selected chapter to practice multiple-choice and short-answ
 
 **Progress and quests** displays the seven-day XP chart, estimated practice time, goals, and leaderboard. A daily reward grants 900 XP after 20 answers and starts a new progress cycle. The monthly reward grants 30,000 XP after 12 completed chapters. The backend checks and awards each reward in one transaction. Set `APP_TIME_ZONE` to change the calendar used for streaks and quests. It defaults to `Africa/Casablanca`.
 
+**Profile** lets candidates and administrators change their username and password. Changing a password ends existing sessions. Candidates can delete their own account after confirming the password.
+
 - `backend/` contains the Spring Boot controllers, account service, JDBC repository, security configuration and Flyway migrations.
 - `desktop/` contains the JavaFX screens, controllers and HTTP client.
 - The `legacy-baseline` tag identifies the complete original source snapshot. See the [migration plan](MIGRATION_PLAN.md) and [legacy acceptance checklist](docs/legacy-acceptance.md).

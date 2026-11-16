@@ -1,6 +1,7 @@
 package com.interviewai.backend.security;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.interviewai.backend.repository.AccountRepository;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -13,6 +14,7 @@ import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.context.HttpSessionSecurityContextRepository;
 import org.springframework.security.web.context.SecurityContextRepository;
+import org.springframework.security.web.context.SecurityContextHolderFilter;
 import org.springframework.security.web.csrf.CsrfTokenRepository;
 import org.springframework.security.web.csrf.HttpSessionCsrfTokenRepository;
 
@@ -42,8 +44,9 @@ public class SecurityConfig {
 
     @Bean
     SecurityFilterChain securityFilterChain(HttpSecurity http, SecurityContextRepository sessions,
-            CsrfTokenRepository csrfTokens, ObjectMapper json) throws Exception {
+            CsrfTokenRepository csrfTokens, ObjectMapper json, AccountRepository accounts) throws Exception {
         http.securityContext(context -> context.securityContextRepository(sessions))
+                .addFilterAfter(new AccountSessionFilter(accounts, json), SecurityContextHolderFilter.class)
                 .csrf(csrf -> csrf.csrfTokenRepository(csrfTokens))
                 .requestCache(cache -> cache.disable())
                 .authorizeHttpRequests(requests -> requests

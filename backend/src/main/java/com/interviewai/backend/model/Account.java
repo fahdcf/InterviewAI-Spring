@@ -7,13 +7,15 @@ public class Account {
     private final String email;
     private final String passwordHash;
     private final boolean active;
+    private final int sessionVersion;
 
-    public Account(int id, String username, String email, String passwordHash, boolean active) {
+    public Account(int id, String username, String email, String passwordHash, boolean active, int sessionVersion) {
         this.id = id;
         this.username = username;
         this.email = email;
         this.passwordHash = passwordHash;
         this.active = active;
+        this.sessionVersion = sessionVersion;
     }
 
     public int getId() { return id; }
@@ -21,4 +23,5 @@ public class Account {
     public String getEmail() { return email; }
     public String getPasswordHash() { return passwordHash; }
     public boolean isActive() { return active; }
+    public int getSessionVersion() { return sessionVersion; }
 }

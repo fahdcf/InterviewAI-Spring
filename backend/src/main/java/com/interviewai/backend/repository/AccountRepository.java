@@ -15,7 +15,7 @@ import java.util.Optional;
 public class AccountRepository {
 
     private static final String ACCOUNT_COLUMNS =
-            "SELECT id, username, email, password_hash, is_active FROM users";
+            "SELECT id, username, email, password_hash, is_active, session_version FROM users";
 
     private final JdbcTemplate jdbc;
 
@@ -96,8 +96,32 @@ public class AccountRepository {
                 newHash, userId, oldHash);
     }
 
+    public boolean isSessionCurrent(int userId, int version) {
+        Integer count = jdbc.queryForObject("""
+                SELECT COUNT(*) FROM users WHERE id = ? AND is_active = TRUE AND session_version = ?
+                """, Integer.class, userId, version);
+        return count != null && count == 1;
+    }
+
+    public void updateUsername(int userId, String username) {
+        jdbc.update("UPDATE users SET username = ? WHERE id = ?", username, userId);
+    }
+
+    public void changePassword(int userId, String encodedPassword) {
+        jdbc.update("UPDATE users SET password_hash = ?, session_version = session_version + 1 WHERE id = ?",
+                encodedPassword, userId);
+    }
+
+    public void deleteAccount(int userId) {
+        jdbc.update("DELETE FROM progress WHERE user_id = ?", userId);
+        jdbc.update("DELETE FROM feedback WHERE user_id = ? OR course_id IN (SELECT id FROM generated_courses WHERE user_id = ?)",
+                userId, userId);
+        jdbc.update("DELETE FROM generated_courses WHERE user_id = ?", userId);
+        jdbc.update("DELETE FROM users WHERE id = ?", userId);
+    }
+
     private Account mapAccount(ResultSet row, int rowNumber) throws SQLException {
         return new Account(row.getInt("id"), row.getString("username"), row.getString("email"),
-                row.getString("password_hash"), row.getBoolean("is_active"));
+                row.getString("password_hash"), row.getBoolean("is_active"), row.getInt("session_version"));
     }
 }

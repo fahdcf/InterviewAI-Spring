@@ -105,6 +105,11 @@ public class DashboardController {
     }
 
     @FXML
+    private void openProfile() {
+        navigator.showProfile(account);
+    }
+
+    @FXML
     private void selectCourse() {
         CourseSummary course = coursePicker.getValue();
         if (rendering || current == null || course == null

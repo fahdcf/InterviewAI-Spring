@@ -13,6 +13,7 @@
     <VBox alignment="CENTER" spacing="14" maxWidth="420" styleClass="auth-dark">
         <Label fx:id="accountLabel" wrapText="true" styleClass="title-dark"/>
         <Label fx:id="statusLabel" wrapText="true" styleClass="subtitle-dark"/>
+        <Button text="Profile" onAction="#openProfile" styleClass="button-link"/>
         <Button fx:id="logoutButton" text="Sign out" onAction="#onLogout" styleClass="btn-primary-blue"/>
     </VBox>
 </StackPane>

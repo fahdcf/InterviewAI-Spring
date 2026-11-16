@@ -55,4 +55,9 @@ public class AccountController {
         });
         executor.execute(task);
     }
+
+    @FXML
+    private void openProfile() {
+        navigator.showProfile(account);
+    }
 }
