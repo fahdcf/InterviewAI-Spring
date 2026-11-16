@@ -80,3 +80,5 @@ Short-answer grading sends the question, expected answer and your answer to Open
 The default test run uses a disposable in-memory database and a local Gemini test server for backend HTTP integration tests. It covers accounts, sessions, course browsing, onboarding, generation, and generation retry. Desktop tests cover connection responses.
 
 To run the backend tests against a separate MySQL database, configure `TEST_DB_URL`, `TEST_DB_USER` and `TEST_DB_PASSWORD`, then run `.\mvnw.cmd -pl backend test`. Use a disposable database since the suite inserts test accounts and changes their roles and status.
+
+Run `.\mvnw.cmd -pl desktop -Pui-tests test` from an interactive desktop to check the JavaFX views. To build the Windows desktop ZIP and runnable backend JAR, run `.\scripts\package-windows.ps1`. See the [migration status](docs/migration-status.md) and [release checklist](docs/release-checklist.md) for verification and remaining release checks.

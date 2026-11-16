@@ -29,4 +29,6 @@ The upgrade was rehearsed on MySQL 8.4.13 using the pinned legacy SQL and a synt
 
 V5 adds answer attempt history and V6 records quest claims. The backend uses a UTC MySQL session and applies `APP_TIME_ZONE` to display and count dates. Review legacy `DATETIME` values such as chapter completion and quest resets against their original database timezone during the cutover rehearsal.
 
+V7 adds a session version to each account so password changes, suspension and role changes can invalidate signed-in sessions. The upgrade and restore rehearsal applied V2–V7 to a synthetic legacy database, then imported a dump of the upgraded database into a second MySQL instance.
+
 For HTTPS deployment, set `SESSION_COOKIE_SECURE=true` on the backend.
