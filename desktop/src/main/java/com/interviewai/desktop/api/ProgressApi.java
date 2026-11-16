@@ -25,6 +25,11 @@ public class ProgressApi {
         api.writeJson("POST", "/api/v1/goals", Map.of("name", name, "type", type, "target", target), Void.class);
     }
 
+    public void updateGoal(int id, String name, String type, int target) throws IOException, InterruptedException {
+        api.writeJson("PATCH", "/api/v1/goals/" + id,
+                Map.of("name", name, "type", type, "target", target), Void.class);
+    }
+
     public void removeGoal(int id) throws IOException, InterruptedException {
         api.writeJson("DELETE", "/api/v1/goals/" + id, Map.of(), Void.class);
     }

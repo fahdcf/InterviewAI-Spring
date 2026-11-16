@@ -36,6 +36,7 @@
             <ComboBox fx:id="goalType"/>
             <TextField fx:id="goalTarget" promptText="Target" prefWidth="95" styleClass="input-dark"/>
             <Button text="Add goal" onAction="#addGoal" styleClass="btn-primary-blue"/>
+            <Button text="Update selected" onAction="#updateGoal" styleClass="button-link"/>
             <Button text="Remove selected" onAction="#removeGoal" styleClass="button-link"/>
         </FlowPane>
         <Label text="Quests" styleClass="title-dark"/>

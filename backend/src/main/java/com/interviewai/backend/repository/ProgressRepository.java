@@ -7,6 +7,7 @@ import org.springframework.stereotype.Repository;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 
 @Repository
 public class ProgressRepository {
@@ -69,11 +70,29 @@ public class ProgressRepository {
     }
 
     public List<GoalResponse> goals(int userId) {
-        return jdbc.query("""
+        return readGoals("""
                 SELECT id, goal_name, goal_type, target_value, start_value FROM user_goals
                 WHERE user_id = ? AND is_active = TRUE ORDER BY created_at, id
-                """, (row, index) -> new GoalResponse(row.getInt("id"), row.getString("goal_name"),
-                row.getString("goal_type"), row.getInt("target_value"), row.getInt("start_value"), 0), userId);
+                """, userId);
+    }
+
+    public Optional<GoalResponse> findGoal(int userId, int id) {
+        return readGoals("""
+                SELECT id, goal_name, goal_type, target_value, start_value FROM user_goals
+                WHERE user_id = ? AND id = ? AND is_active = TRUE
+                """, userId, id).stream().findFirst();
+    }
+
+    private List<GoalResponse> readGoals(String sql, Object... parameters) {
+        return jdbc.query(sql, (row, index) -> new GoalResponse(row.getInt("id"), row.getString("goal_name"),
+                row.getString("goal_type"), row.getInt("target_value"), row.getInt("start_value"), 0), parameters);
+    }
+
+    public void updateGoal(int userId, int id, String name, String type, int target, int baseline) {
+        jdbc.update("""
+                UPDATE user_goals SET goal_name = ?, goal_type = ?, target_value = ?, start_value = ?
+                WHERE user_id = ? AND id = ? AND is_active = TRUE
+                """, name, type, target, baseline, userId, id);
     }
 
     public void addGoal(int userId, String name, String type, int target, int baseline) {

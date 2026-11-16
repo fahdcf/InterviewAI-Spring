@@ -64,15 +64,29 @@ public class ProgressService {
     @Transactional
     public void addGoal(int userId, GoalRequest goal) {
         accounts.lockActiveAccount(userId);
-        long current = "STREAK".equals(goal.type()) ? 0 : metric(userId, goal.type());
-        int baseline = (int) Math.min(Integer.MAX_VALUE, current);
-        progress.addGoal(userId, goal.name().strip(), goal.type(), goal.target(), baseline);
+        progress.addGoal(userId, goal.name().strip(), goal.type(), goal.target(), baseline(userId, goal.type()));
     }
 
+    @Transactional
+    public void updateGoal(int userId, int id, GoalRequest goal) {
+        accounts.lockActiveAccount(userId);
+        GoalResponse existing = progress.findGoal(userId, id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Goal unavailable."));
+        int startValue = existing.type().equals(goal.type()) ? existing.startValue() : baseline(userId, goal.type());
+        progress.updateGoal(userId, id, goal.name().strip(), goal.type(), goal.target(), startValue);
+    }
+
+    @Transactional
     public void removeGoal(int userId, int id) {
+        accounts.lockActiveAccount(userId);
         if (!progress.removeGoal(userId, id)) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Goal unavailable.");
         }
+    }
+
+    private int baseline(int userId, String type) {
+        long current = "STREAK".equals(type) ? 0 : metric(userId, type);
+        return (int) Math.min(Integer.MAX_VALUE, current);
     }
 
     private long metric(int userId, String type) {

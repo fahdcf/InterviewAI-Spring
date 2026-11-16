@@ -7,6 +7,8 @@ import com.interviewai.desktop.api.ProgressApi.Goal;
 import com.interviewai.desktop.api.ProgressApi.Page;
 import com.interviewai.desktop.api.ProgressApi.Quest;
 import com.interviewai.desktop.navigation.DesktopNavigator;
+import javafx.animation.KeyFrame;
+import javafx.animation.Timeline;
 import javafx.concurrent.Task;
 import javafx.fxml.FXML;
 import javafx.scene.chart.BarChart;
@@ -18,10 +20,12 @@ import javafx.scene.control.ListCell;
 import javafx.scene.control.ListView;
 import javafx.scene.control.TextField;
 import javafx.scene.layout.VBox;
+import javafx.util.Duration;
 
+import java.time.Instant;
 import java.time.OffsetDateTime;
-import java.time.format.DateTimeFormatter;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.Callable;
@@ -35,6 +39,8 @@ public class ProgressController {
     private final DesktopNavigator navigator;
     private final Executor executor;
     private final Map<String, UUID> requestIds = new HashMap<>();
+    private final Timeline countdown = new Timeline(new KeyFrame(Duration.seconds(1), event -> updateCountdowns()));
+    private List<Quest> quests = List.of();
 
     @FXML private VBox content;
     @FXML private Label summaryLabel;
@@ -69,6 +75,21 @@ public class ProgressController {
                         + "  ·  " + goal.currentValue() + " / " + goal.target());
             }
         });
+        goals.getSelectionModel().selectedItemProperty().addListener((observable, previous, selected) -> {
+            if (selected != null) {
+                goalName.setText(selected.name());
+                goalType.setValue(selected.type());
+                goalTarget.setText(Integer.toString(selected.target()));
+            }
+        });
+        countdown.setCycleCount(Timeline.INDEFINITE);
+        content.sceneProperty().addListener((observable, previous, current) -> {
+            if (current == null) {
+                countdown.stop();
+            } else {
+                countdown.play();
+            }
+        });
         refresh();
     }
 
@@ -79,6 +100,20 @@ public class ProgressController {
 
     @FXML
     private void addGoal() {
+        saveGoal(null);
+    }
+
+    @FXML
+    private void updateGoal() {
+        Goal selected = goals.getSelectionModel().getSelectedItem();
+        if (selected == null) {
+            statusLabel.setText("Select a goal to update.");
+            return;
+        }
+        saveGoal(selected);
+    }
+
+    private void saveGoal(Goal selected) {
         String name = goalName.getText().strip();
         String type = goalType.getValue();
         int target;
@@ -92,10 +127,15 @@ public class ProgressController {
             statusLabel.setText("Enter a goal name and a target greater than zero.");
             return;
         }
-        run("Adding goal…", () -> {
-            api.addGoal(name, type, target);
+        run("Saving goal…", () -> {
+            if (selected == null) {
+                api.addGoal(name, type, target);
+            } else {
+                api.updateGoal(selected.id(), name, type, target);
+            }
             return null;
         }, result -> {
+            goals.getSelectionModel().clearSelection();
             goalName.clear();
             goalTarget.clear();
             refresh();
@@ -161,22 +201,29 @@ public class ProgressController {
         for (ProgressApi.Ranking entry : page.leaderboard()) {
             rankings.getItems().add(String.format("%s  ·  %,d XP", entry.username(), entry.xp()));
         }
-        for (Quest quest : page.quests()) {
+        quests = page.quests();
+        updateCountdowns();
+        statusLabel.setText("");
+    }
+
+    private void updateCountdowns() {
+        for (Quest quest : quests) {
             if ("daily".equals(quest.type())) {
                 showQuest(quest, dailyLabel, dailyClaim);
             } else {
                 showQuest(quest, monthlyLabel, monthlyClaim);
             }
         }
-        statusLabel.setText("");
     }
 
     private void showQuest(Quest quest, Label label, Button button) {
-        String reset = OffsetDateTime.parse(quest.resetsAt())
-                .format(DateTimeFormatter.ofPattern("d MMM, HH:mm xxx"));
-        label.setText(String.format("%d / %d  ·  %,d XP%s%nNext reset %s", quest.current(), quest.target(),
+        Instant endsAt = OffsetDateTime.parse(quest.resetsAt()).toInstant();
+        long remaining = Math.max(0, java.time.Duration.between(Instant.now(), endsAt).toSeconds());
+        String reset = remaining == 0 ? "Refresh to load the new quest" : String.format("Resets in %dd %02d:%02d:%02d",
+                remaining / 86_400, remaining / 3_600 % 24, remaining / 60 % 60, remaining % 60);
+        label.setText(String.format("%d / %d  ·  %,d XP%s%n%s", quest.current(), quest.target(),
                 quest.reward(), quest.claimed() ? "  ·  Claimed" : "", reset));
-        button.setDisable(!quest.available());
+        button.setDisable(!quest.available() || remaining == 0);
     }
 
     private <T> void run(String message, Callable<T> work, Consumer<T> success) {

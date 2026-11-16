@@ -484,6 +484,22 @@ class AuthControllerTest {
         assertEquals(200, post(daily, claim, csrf()).statusCode());
         assertEquals(409, post(daily, Map.of("requestId", UUID.randomUUID().toString()), csrf()).statusCode());
         assertEquals(900, json.readTree(get("/goals").body()).get(0).path("currentValue").asInt());
+        int goalId = json.readTree(get("/goals").body()).get(0).path("id").asInt();
+        String goalPath = "/goals/" + goalId;
+        assertEquals(204, write("PATCH", goalPath, Map.of("name", "Earn more points", "type", "XP", "target", "1000"),
+                csrf()).statusCode());
+        JsonNode updatedGoal = json.readTree(get("/goals").body()).get(0);
+        assertEquals("Earn more points", updatedGoal.path("name").asText());
+        assertEquals(1000, updatedGoal.path("target").asInt());
+        assertEquals(40, updatedGoal.path("startValue").asInt());
+        assertEquals(900, updatedGoal.path("currentValue").asInt());
+        assertEquals(404, write("PATCH", "/goals/-1", Map.of("name", "Missing", "type", "XP", "target", "1000"),
+                csrf()).statusCode());
+        assertEquals(204, write("PATCH", goalPath, Map.of("name", "Answer more questions", "type", "QUESTIONS",
+                "target", "30"), csrf()).statusCode());
+        JsonNode changedGoal = json.readTree(get("/goals").body()).get(0);
+        assertEquals(20, changedGoal.path("startValue").asInt());
+        assertEquals(0, changedGoal.path("currentValue").asInt());
 
         for (int count = 1; count <= 12; count++) {
             jdbc.update("""
