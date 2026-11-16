@@ -13,14 +13,16 @@ import java.util.Optional;
 public class CourseJobService {
 
     private final CourseJobRepository jobs;
+    private final AccountService accounts;
 
-    public CourseJobService(CourseJobRepository jobs) {
+    public CourseJobService(CourseJobRepository jobs, AccountService accounts) {
         this.jobs = jobs;
+        this.accounts = accounts;
     }
 
     @Transactional
     public CourseJob start(int userId, String requestId, Long retryJobId) {
-        jobs.lockUser(userId);
+        accounts.lockActiveAccount(userId);
         Optional<CourseJob> existing = jobs.findByRequest(userId, requestId);
         if (existing.isPresent()) {
             return existing.get();

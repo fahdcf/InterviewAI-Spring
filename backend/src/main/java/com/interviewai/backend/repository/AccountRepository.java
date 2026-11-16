@@ -39,6 +39,12 @@ public class AccountRepository {
                 .stream().findFirst();
     }
 
+    public boolean lockActiveAccount(int id) {
+        List<Boolean> rows = jdbc.query("SELECT is_active FROM users WHERE id = ? FOR UPDATE",
+                (row, index) -> row.getBoolean("is_active"), id);
+        return !rows.isEmpty() && rows.getFirst();
+    }
+
     public List<String> findRoles(int userId) {
         return jdbc.queryForList("""
                 SELECT r.name

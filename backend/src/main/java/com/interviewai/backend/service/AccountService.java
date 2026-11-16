@@ -49,6 +49,12 @@ public class AccountService {
         return new AccountResponse(account.getId(), account.getUsername(), account.getEmail(), roles, administrator);
     }
 
+    public void lockActiveAccount(int userId) {
+        if (!accounts.lockActiveAccount(userId)) {
+            throw new BadCredentialsException("Sign in again.");
+        }
+    }
+
     public void upgradeLegacyPassword(int userId, String password) {
         Account account = findActiveAccount(userId);
         String oldHash = account.getPasswordHash();

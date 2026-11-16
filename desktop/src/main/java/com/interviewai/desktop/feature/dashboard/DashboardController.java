@@ -43,6 +43,8 @@ public class DashboardController {
     @FXML private ComboBox<CourseSummary> coursePicker;
     @FXML private ListView<ChapterSummary> chapterList;
     @FXML private Button saveButton;
+    @FXML private Button reviewChapterButton;
+    @FXML private Button reviewCourseButton;
 
     private DashboardResponse current;
     private boolean rendering;
@@ -111,19 +113,31 @@ public class DashboardController {
     }
 
     @FXML
-    private void saveChapter() {
+    private void openLesson() {
         ChapterSummary chapter = chapterList.getSelectionModel().getSelectedItem();
         if (current == null || current.getActiveCourseId() == null || chapter == null) {
             return;
         }
         int courseId = current.getActiveCourseId();
-        run("Saving chapter…", () -> {
+        run("Opening lesson…", () -> {
             dashboard.saveLocation(courseId, chapter.getId());
-            return dashboard.load();
-        }, result -> {
-            render(result);
-            statusLabel.setText("Chapter saved. It will be selected the next time you sign in.");
-        });
+            return null;
+        }, result -> navigator.showPractice(account, courseId, chapter.getId(), false));
+    }
+
+    @FXML
+    private void reviewChapter() {
+        ChapterSummary chapter = chapterList.getSelectionModel().getSelectedItem();
+        if (current != null && current.getActiveCourseId() != null && chapter != null) {
+            navigator.showPractice(account, current.getActiveCourseId(), chapter.getId(), true);
+        }
+    }
+
+    @FXML
+    private void reviewCourse() {
+        if (current != null && current.getActiveCourseId() != null) {
+            navigator.showPractice(account, current.getActiveCourseId(), null, true);
+        }
     }
 
     @FXML
@@ -177,6 +191,8 @@ public class DashboardController {
 
     private void showChapter(ChapterSummary chapter) {
         saveButton.setDisable(chapter == null);
+        reviewChapterButton.setDisable(chapter == null);
+        reviewCourseButton.setDisable(current == null || current.getActiveCourseId() == null);
         if (chapter == null) {
             chapterName.setText("Select a chapter");
             chapterDescription.setText("");

@@ -12,6 +12,8 @@ InterviewAI is a desktop interview preparation app. This repository contains the
 
 The JavaFX client supports registration, sign-in, sign-out, course browsing, chapter selection, XP and streaks. **Interview preferences** saves interview details and an optional PDF, DOCX, or DOC CV. **Generate courses** starts a background job that produces one technical and one soft-skills course. **Generation status** reopens progress after leaving the waiting screen. The backend saves both courses together after validating every chapter and question.
 
+Open a lesson from a selected chapter to practice multiple-choice and short-answer questions. **Review this chapter** and **Review this course** show incorrect questions. The backend grades multiple-choice answers locally and uses OpenRouter to grade short answers. Feedback and explanations are displayed after an attempt. A passing lesson answer earns 10 XP once per question. Review updates question status.
+
 - `backend/` contains the Spring Boot controllers, account service, JDBC repository, security configuration and Flyway migrations.
 - `desktop/` contains the JavaFX screens, controllers and HTTP client.
 - The `legacy-baseline` tag identifies the complete original source snapshot. See the [migration plan](MIGRATION_PLAN.md) and [legacy acceptance checklist](docs/legacy-acceptance.md).
@@ -30,6 +32,8 @@ $env:DB_USER = 'interviewai'
 $env:DB_PASSWORD = Read-Host 'MySQL password' -MaskInput
 # Optional for browsing existing courses. Required to generate new ones.
 $env:GEMINI_API_KEY = Read-Host 'Gemini API key' -MaskInput
+# Required for short-answer grading.
+$env:OPENROUTER_API_KEY = Read-Host 'OpenRouter API key' -MaskInput
 .\mvnw.cmd -pl backend spring-boot:run
 ```
 
@@ -50,6 +54,8 @@ The desktop defaults to `http://127.0.0.1:8080`. Set `INTERVIEWAI_API_URL` in th
 Choose **Create account**, then sign in with the username or the optional email. New accounts have the candidate role. Imported administrator roles and user-management permissions are recognized at sign-in.
 
 The backend sends interview preferences and up to 4,000 characters of saved CV text to Gemini for generation. You can remove the saved CV in **Interview preferences**. The default endpoint uses Gemini 3.5 Flash. Set `GEMINI_API_URL` to use a different supported GenerateContent endpoint. Run one backend process per database so it can recover interrupted generation jobs on startup. [Gemini API documentation](https://ai.google.dev/api/generate-content)
+
+Short-answer grading sends the question, expected answer and your answer to OpenRouter. Configure the model with `OPENROUTER_MODEL` and the endpoint with `OPENROUTER_API_URL`. The default model is `openai/gpt-4.1-mini`. [OpenRouter chat completions](https://openrouter.ai/docs/api/api-reference/chat/send-chat-completion-request)
 
 ## Verify the build
 

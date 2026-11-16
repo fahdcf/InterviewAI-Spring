@@ -38,8 +38,12 @@
             <padding><Insets top="16" right="0" bottom="12" left="0"/></padding>
             <Label fx:id="chapterName" styleClass="title-dark" wrapText="true"/>
             <Label fx:id="chapterDescription" styleClass="subtitle-dark" wrapText="true"/>
-            <Button fx:id="saveButton" text="Save chapter" onAction="#saveChapter"
+            <Button fx:id="saveButton" text="Open lesson" onAction="#openLesson"
                     styleClass="btn-primary-blue"/>
+            <Button fx:id="reviewChapterButton" text="Review this chapter" onAction="#reviewChapter"
+                    styleClass="button-link"/>
+            <Button fx:id="reviewCourseButton" text="Review this course" onAction="#reviewCourse"
+                    styleClass="button-link"/>
         </VBox>
     </center>
     <bottom>

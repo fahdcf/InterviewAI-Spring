@@ -22,10 +22,6 @@ public class CourseJobRepository {
         this.jdbc = jdbc;
     }
 
-    public void lockUser(int userId) {
-        jdbc.queryForObject("SELECT id FROM users WHERE id = ? FOR UPDATE", Integer.class, userId);
-    }
-
     public Optional<CourseJob> find(int userId, long id) {
         return jdbc.query(SUMMARY + " WHERE user_id = ? AND id = ?", this::map, userId, id).stream().findFirst();
     }

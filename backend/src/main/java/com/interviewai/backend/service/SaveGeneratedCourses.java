@@ -14,17 +14,19 @@ public class SaveGeneratedCourses {
     private final GeneratedCourseRepository courses;
     private final CourseJobRepository jobs;
     private final DashboardRepository dashboard;
+    private final AccountService accounts;
 
     public SaveGeneratedCourses(GeneratedCourseRepository courses, CourseJobRepository jobs,
-            DashboardRepository dashboard) {
+            DashboardRepository dashboard, AccountService accounts) {
         this.courses = courses;
         this.jobs = jobs;
         this.dashboard = dashboard;
+        this.accounts = accounts;
     }
 
     @Transactional
     public void save(CourseJob job, GeneratedCourse technical, GeneratedCourse softSkills) {
-        jobs.lockUser(job.getUserId());
+        accounts.lockActiveAccount(job.getUserId());
         int technicalId = courses.insert(job.getUserId(), technical);
         int softSkillsId = courses.insert(job.getUserId(), softSkills);
         courses.linkPair(job.getUserId(), technicalId, softSkillsId);

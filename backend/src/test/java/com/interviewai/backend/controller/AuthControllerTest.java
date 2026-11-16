@@ -92,9 +92,33 @@ class AuthControllerTest {
                 exchange.getResponseBody().write(response);
             }
         });
+        provider.createContext("/grade", exchange -> {
+            try (exchange) {
+                ObjectMapper json = new ObjectMapper();
+                String userMessage = json.readTree(exchange.getRequestBody())
+                        .path("messages").path(1).path("content").asText();
+                String answer = json.readTree(userMessage).path("candidateAnswer").asText();
+                if ("unavailable".equals(answer)) {
+                    exchange.sendResponseHeaders(503, -1);
+                    return;
+                }
+                String grade = json.writeValueAsString(Map.of(
+                        "score", "mostly correct".equals(answer) ? 70 : 69,
+                        "strengths", "You covered the basic idea.",
+                        "improvements", "You can add an example.",
+                        "explanation", "Sample grade."));
+                byte[] response = json.writeValueAsBytes(Map.of("choices", List.of(
+                        Map.of("message", Map.of("content", grade)))));
+                exchange.getResponseHeaders().set("Content-Type", "application/json");
+                exchange.sendResponseHeaders(200, response.length);
+                exchange.getResponseBody().write(response);
+            }
+        });
         provider.start();
         registry.add("interviewai.gemini.key", () -> "test-key");
         registry.add("interviewai.gemini.url", () -> "http://127.0.0.1:" + provider.getAddress().getPort() + "/generate");
+        registry.add("interviewai.openrouter.key", () -> "test-key");
+        registry.add("interviewai.openrouter.url", () -> "http://127.0.0.1:" + provider.getAddress().getPort() + "/grade");
     }
 
     @AfterAll
@@ -354,6 +378,85 @@ class AuthControllerTest {
             Thread.sleep(200);
         }
         throw new AssertionError("Course generation did not finish.");
+    }
+
+    @Test
+    void lessonAnswersAndReviewUpdateProgressAndPreventDuplicateXp() throws Exception {
+        int userId = registerAndSignIn();
+        int course = insertCourse(userId, "Practice");
+        int chapter = insertChapter(course, "Test questions");
+        int first = addQuestion(chapter, "First?", "MULTIPLE_CHOICE");
+        int second = addQuestion(chapter, "Second?", "MULTIPLE_CHOICE");
+        JsonNode questions = json.readTree(get("/chapters/" + chapter + "/questions").body());
+        assertFalse(questions.get(0).has("correctAnswer"));
+        assertEquals(2, questions.size());
+
+        String request = UUID.randomUUID().toString();
+        JsonNode correct = answer(first, "LESSON", "Expected", request, 200);
+        assertEquals(10, correct.path("xpAwarded").asInt());
+        assertEquals(correct.path("id"), answer(first, "LESSON", "Expected", request, 200).path("id"));
+        assertEquals(0, answer(first, "LESSON", "Expected", UUID.randomUUID().toString(), 200)
+                .path("xpAwarded").asInt());
+        assertEquals(0, answer(second, "LESSON", "Other", UUID.randomUUID().toString(), 200).path("score").asInt());
+        assertEquals(1, json.readTree(get("/courses/" + course + "/review").body()).size());
+        assertEquals("COMPLETED", jdbc.queryForObject("SELECT status FROM chapters WHERE id = ?", String.class, chapter));
+        assertEquals(0, answer(second, "REVIEW", "Expected", UUID.randomUUID().toString(), 200)
+                .path("xpAwarded").asInt());
+        assertTrue(json.readTree(get("/chapters/" + chapter + "/review").body()).isEmpty());
+        assertEquals(10, json.readTree(get("/dashboard").body()).path("totalXp").asInt());
+    }
+
+    @Test
+    void shortAnswersUseThePassingThresholdAndFailuresLeaveProgressAlone() throws Exception {
+        int userId = registerAndSignIn();
+        int course = insertCourse(userId, "Short answers");
+        int chapter = insertChapter(course, "Test questions");
+        int question = addQuestion(chapter, "Explain the concept.", "SHORT_ANSWER");
+        JsonNode failure = awaitAttempt(answer(question, "LESSON", "unavailable", UUID.randomUUID().toString(), 202));
+        assertEquals("FAILED", failure.path("status").asText());
+        assertEquals("NOT_STARTED", jdbc.queryForObject("SELECT status FROM questions WHERE id = ?", String.class, question));
+
+        JsonNode below = awaitAttempt(answer(question, "LESSON", "partial", UUID.randomUUID().toString(), 202));
+        assertEquals(69, below.path("score").asInt());
+        assertEquals(0, below.path("xpAwarded").asInt());
+        JsonNode passing = awaitAttempt(answer(question, "LESSON", "mostly correct", UUID.randomUUID().toString(), 202));
+        assertEquals(70, passing.path("score").asInt());
+        assertEquals(10, passing.path("xpAwarded").asInt());
+    }
+
+    private int addQuestion(int chapter, String title, String type) {
+        jdbc.update("""
+                INSERT INTO questions (chapter_id, question, question_type, correct_answer, explanation)
+                VALUES (?, ?, ?, 'Expected', 'Review the example.')
+                """, chapter, title, type);
+        int id = jdbc.queryForObject("SELECT id FROM questions WHERE chapter_id = ? AND question = ?",
+                Integer.class, chapter, title);
+        if ("MULTIPLE_CHOICE".equals(type)) {
+            jdbc.update("INSERT INTO choices (question_id, choice_text) VALUES (?, 'Expected'), (?, 'Other')", id, id);
+        }
+        return id;
+    }
+
+    private JsonNode answer(int question, String mode, String text, String request, int expectedStatus) throws Exception {
+        HttpResponse<String> response = post("/questions/" + question + "/attempts",
+                Map.of("mode", mode, "answer", text, "requestId", request), csrf());
+        assertEquals(expectedStatus, response.statusCode(), response.body());
+        return json.readTree(response.body());
+    }
+
+    private JsonNode awaitAttempt(JsonNode accepted) throws Exception {
+        long id = accepted.path("id").asLong();
+        for (int attempt = 0; attempt < 50; attempt++) {
+            HttpResponse<String> response = get("/attempts/" + id);
+            assertEquals(200, response.statusCode(), response.body());
+            JsonNode result = json.readTree(response.body());
+            String status = result.path("status").asText();
+            if ("GRADED".equals(status) || "FAILED".equals(status)) {
+                return result;
+            }
+            Thread.sleep(150);
+        }
+        throw new AssertionError("Answer grading did not finish.");
     }
 
     @Test
