@@ -1,0 +1,29 @@
+name: Provider acceptance
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  providers:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+      - name: Generate courses, grade an answer, and request an explanation
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+        run: |
+          if [[ -z "$GEMINI_API_KEY" || -z "$OPENROUTER_API_KEY" ]]; then
+            echo "::error::Configure GEMINI_API_KEY and OPENROUTER_API_KEY as Actions secrets."
+            exit 1
+          fi
+          ./mvnw -B -ntp -pl backend -Dtest=ProviderAcceptanceTest -Dinterviewai.provider.acceptance=true test

@@ -20,7 +20,7 @@ The `Verify` workflow publishes both packages as the `interviewai-windows-build`
 - [x] Re-run backend tests on MySQL with `TEST_DB_URL`, `TEST_DB_USER` and `TEST_DB_PASSWORD` set to a disposable database.
 - [x] Load the migrated candidate and administrator views with the JavaFX smoke profile.
 - [x] Start the packaged Spring Boot JAR. Extract and start the Windows desktop application using its bundled runtime.
-- [ ] Download and launch the packaged desktop app on the separate Windows runner.
+- [x] Download and launch the packaged desktop app on a separate Windows runner. The sign-in window opened with `JAVA_HOME` unset, Java removed from `PATH`, and the bundled JVM loaded. [Windows installation check](https://github.com/fahdcf/InterviewAI-Spring/actions/runs/43962100088/job/133633055383)
 - [x] Exercise the full candidate flow over HTTP on MySQL using local provider fixtures, from registration and course generation through completing a 40-question chapter, reviewing a missed answer, checking XP, and signing out.
 - [x] Exercise the candidate flow through the JavaFX application against a separate packaged Spring Boot process, MySQL, and local provider fixtures. Verify both generated courses, all 40 answers in the first chapter, missed-answer review, explanations, a daily reward, a saved goal, and progress after signing out and signing back in.
 - [x] Send two requests for the same daily quest reward and verify the account receives one award.
@@ -45,3 +45,13 @@ The README covers required environment variables and development startup. Use a 
 The `Verify` workflow runs the full desktop flow against a disposable backend and starts the same provider fixtures used by the backend integration tests. To run just the desktop tests against a separately started disposable backend, set `INTERVIEWAI_API_URL` to its origin and run `.\mvnw.cmd -pl desktop -Pui-tests "-Dinterviewai.journey=true" test` in an interactive Windows session. The fixture responses provide predictable choices and grades for this scenario. To include the administrator steps, provision a synthetic administrator with the password `synthetic-password` on the disposable database and set `INTERVIEWAI_TEST_ADMIN` to that username. The test changes only the candidate and courses created during that run.
 
 For a remote deployment, put an HTTPS reverse proxy on the backend host, forward requests to the backend on loopback, and set `SESSION_COOKIE_SECURE=true`. Configure the desktop with the proxy's HTTPS origin using `INTERVIEWAI_API_URL`. Keep the database on persistent storage and configure your service manager to restart the backend after a failure.
+
+## Live providers
+
+Add `GEMINI_API_KEY` and `OPENROUTER_API_KEY` as repository Actions secrets and run **Provider acceptance** from the Actions tab when ready to use provider quota. The workflow extracts text from a synthetic PDF, asks Gemini for both complete courses, and checks OpenRouter grading and explanations. It logs model identifiers and elapsed times. Repeat a learning flow against the deployed backend for the separate deployment acceptance check.
+
+To use local backend credentials or different supported models, configure the values described in the README and run:
+
+```powershell
+.\mvnw.cmd -pl backend "-Dtest=ProviderAcceptanceTest" "-Dinterviewai.provider.acceptance=true" test
+```
