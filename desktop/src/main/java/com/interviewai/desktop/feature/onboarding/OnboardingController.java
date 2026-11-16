@@ -2,6 +2,7 @@ package com.interviewai.desktop.feature.onboarding;
 
 import com.interviewai.desktop.api.AccountSummary;
 import com.interviewai.desktop.api.ApiException;
+import com.interviewai.desktop.api.CourseJobApi;
 import com.interviewai.desktop.api.OnboardingApi;
 import com.interviewai.desktop.api.dto.OnboardingPreferences;
 import com.interviewai.desktop.navigation.DesktopNavigator;
@@ -19,6 +20,7 @@ import javafx.util.StringConverter;
 import java.io.File;
 import java.nio.file.Path;
 import java.util.Locale;
+import java.util.UUID;
 import java.util.concurrent.Callable;
 import java.util.concurrent.Executor;
 import java.util.function.Consumer;
@@ -27,6 +29,7 @@ public class OnboardingController {
 
     private final AccountSummary account;
     private final OnboardingApi api;
+    private final CourseJobApi courseJobs;
     private final DesktopNavigator navigator;
     private final Executor executor;
 
@@ -41,11 +44,14 @@ public class OnboardingController {
     @FXML private Label statusLabel;
 
     private Path cv;
+    private UUID generationRequest;
 
-    public OnboardingController(AccountSummary account, OnboardingApi api, DesktopNavigator navigator,
+    public OnboardingController(AccountSummary account, OnboardingApi api, CourseJobApi courseJobs,
+            DesktopNavigator navigator,
             Executor executor) {
         this.account = account;
         this.api = api;
+        this.courseJobs = courseJobs;
         this.navigator = navigator;
         this.executor = executor;
     }
@@ -104,6 +110,15 @@ public class OnboardingController {
 
     @FXML
     private void save() {
+        savePreferences(false);
+    }
+
+    @FXML
+    private void generate() {
+        savePreferences(true);
+    }
+
+    private void savePreferences(boolean generate) {
         if (context.getText().isBlank()) {
             statusLabel.setText("Enter the role, programme, or other context for the interview.");
             return;
@@ -117,6 +132,17 @@ public class OnboardingController {
         preferences.setRemoveCv(removeCv.isSelected());
         Path file = preferences.isRemoveCv() ? null : cv;
 
+        if (generate) {
+            if (generationRequest == null) {
+                generationRequest = UUID.randomUUID();
+            }
+            UUID request = generationRequest;
+            run("Starting course generation…", () -> {
+                api.save(preferences, file);
+                return courseJobs.start(request);
+            }, job -> navigator.showCourseJob(account, job));
+            return;
+        }
         run("Saving preferences…", () -> api.save(preferences, file), saved -> {
             cv = null;
             showSavedCv(saved.isHasCv());

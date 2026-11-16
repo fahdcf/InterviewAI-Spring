@@ -1,6 +1,6 @@
 # Database setup and upgrade
 
-The backend uses MySQL 8.4 and Flyway. Set `DB_URL`, `DB_USER` and `DB_PASSWORD` in the backend process environment. Use an empty MySQL schema for a fresh setup. Flyway applies V1 for the base schema, V2 for unique account emails, and V3 for saved interview descriptions and extracted CV text.
+The backend uses MySQL 8.4 and Flyway. Set `DB_URL`, `DB_USER` and `DB_PASSWORD` in the backend process environment. Use an empty MySQL schema for a fresh setup. Flyway applies V1 for the base schema, V2 for unique account emails, V3 for interview preferences and CV text, and V4 for generation jobs.
 
 ## Upgrading a copy of the original database
 

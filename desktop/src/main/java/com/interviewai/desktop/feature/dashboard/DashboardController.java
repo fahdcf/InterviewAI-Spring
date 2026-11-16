@@ -93,6 +93,11 @@ public class DashboardController {
     }
 
     @FXML
+    private void openCourseJob() {
+        navigator.showCourseJob(account, null);
+    }
+
+    @FXML
     private void selectCourse() {
         CourseSummary course = coursePicker.getValue();
         if (rendering || current == null || course == null

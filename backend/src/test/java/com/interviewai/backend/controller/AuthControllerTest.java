@@ -2,6 +2,10 @@ package com.interviewai.backend.controller;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.sun.net.httpserver.HttpServer;
+import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -11,9 +15,13 @@ import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.annotation.DirtiesContext;
+import org.springframework.test.context.DynamicPropertyRegistry;
+import org.springframework.test.context.DynamicPropertySource;
 
 import java.net.CookieManager;
 import java.net.HttpCookie;
+import java.net.InetSocketAddress;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -21,8 +29,11 @@ import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.util.HexFormat;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -31,9 +42,67 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @ActiveProfiles("test")
+@DirtiesContext
 class AuthControllerTest {
 
     private static final String PASSWORD = "synthetic-test-password";
+    private static HttpServer provider;
+
+    @DynamicPropertySource
+    static void configureProvider(DynamicPropertyRegistry registry) throws Exception {
+        provider = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        provider.createContext("/generate", exchange -> {
+            try (exchange) {
+                ObjectMapper json = new ObjectMapper();
+                String prompt = json.readTree(exchange.getRequestBody())
+                        .path("contents").path(0).path("parts").path(0).path("text").asText();
+                ObjectNode content = json.createObjectNode();
+                ArrayNode chapters = content.putArray("chapters");
+                if (prompt.contains("Generate a comprehensive interview preparation course outline")) {
+                    boolean failSoftSkills = prompt.contains("FAIL_SOFT_SKILLS") && prompt.contains("Behavioural");
+                    content.put("course_title", "Generated preparation");
+                    for (int number = 1; number <= (failSoftSkills ? 2 : 12); number++) {
+                        chapters.addObject().put("chapter_number", number)
+                                .put("name", "Chapter " + number).put("description", "Practice topics.");
+                    }
+                } else {
+                    Matcher matcher = Pattern.compile("(?m)^Chapter (\\d+):").matcher(prompt);
+                    while (matcher.find()) {
+                        int number = Integer.parseInt(matcher.group(1));
+                        ArrayNode questions = chapters.addObject().put("chapter_number", number).putArray("questions");
+                        for (int count = 1; count <= 40; count++) {
+                            boolean multipleChoice = count <= 20;
+                            ObjectNode question = questions.addObject().put("question", "Question " + count + "?")
+                                    .put("question_type", multipleChoice ? "MULTIPLE_CHOICE" : "SHORT_ANSWER")
+                                    .put("correct_answer", "Example").put("explanation", "Sample explanation.");
+                            if (multipleChoice) {
+                                ArrayNode choices = question.putArray("choices");
+                                for (String choice : List.of("Example", "Second", "Third", "Fourth")) {
+                                    choices.add(choice);
+                                }
+                            }
+                        }
+                    }
+                }
+                byte[] response = json.writeValueAsBytes(Map.of("candidates", List.of(Map.of(
+                        "finishReason", "STOP", "content", Map.of("parts", List.of(
+                                Map.of("text", json.writeValueAsString(content))))))));
+                exchange.getResponseHeaders().set("Content-Type", "application/json");
+                exchange.sendResponseHeaders(200, response.length);
+                exchange.getResponseBody().write(response);
+            }
+        });
+        provider.start();
+        registry.add("interviewai.gemini.key", () -> "test-key");
+        registry.add("interviewai.gemini.url", () -> "http://127.0.0.1:" + provider.getAddress().getPort() + "/generate");
+    }
+
+    @AfterAll
+    static void stopProvider() {
+        if (provider != null) {
+            provider.stop(0);
+        }
+    }
 
     @LocalServerPort private int port;
     @Autowired private ObjectMapper json;
@@ -214,6 +283,77 @@ class AuthControllerTest {
                 .header(token.path("headerName").asText(), token.path("token").asText())
                 .POST(HttpRequest.BodyPublishers.ofByteArrays(parts)).build();
         return client.send(request, HttpResponse.BodyHandlers.ofString());
+    }
+
+    @Test
+    void generationSavesBothCoursesAndDeduplicatesRepeatedRequests() throws Exception {
+        int userId = registerAndSignIn();
+        saveGenerationInput("Software developer");
+        Map<String, String> request = Map.of("requestId", UUID.randomUUID().toString());
+        HttpResponse<String> accepted = post("/course-jobs", request, csrf());
+        assertEquals(202, accepted.statusCode(), accepted.body());
+        long jobId = json.readTree(accepted.body()).path("id").asLong();
+        JsonNode duplicate = json.readTree(post("/course-jobs", request, csrf()).body());
+        assertEquals(jobId, duplicate.path("id").asLong());
+
+        JsonNode result = awaitCourseJob(jobId);
+        assertEquals("SUCCEEDED", result.path("status").asText(), result.toString());
+        assertEquals(100, result.path("progress").asInt());
+        assertEquals(2, json.readTree(get("/courses").body()).size());
+        assertEquals(1, jdbc.queryForObject("SELECT COUNT(*) FROM interview_prep WHERE user_id = ?", Integer.class, userId));
+        assertEquals(960, jdbc.queryForObject("""
+                SELECT COUNT(*) FROM questions q JOIN chapters c ON c.id = q.chapter_id
+                JOIN generated_courses g ON g.id = c.course_id WHERE g.user_id = ?
+                """, Integer.class, userId));
+        assertEquals(jobId, json.readTree(get("/course-jobs/latest").body()).path("id").asLong());
+    }
+
+    @Test
+    void anInvalidSecondCourseLeavesNoPartialCourseAndCanBeRetried() throws Exception {
+        registerAndSignIn();
+        saveGenerationInput("FAIL_SOFT_SKILLS");
+        Map<String, String> request = Map.of("requestId", UUID.randomUUID().toString());
+        HttpResponse<String> accepted = post("/course-jobs", request, csrf());
+        assertEquals(202, accepted.statusCode(), accepted.body());
+        long jobId = json.readTree(accepted.body()).path("id").asLong();
+        JsonNode failed = awaitCourseJob(jobId);
+        assertEquals("FAILED", failed.path("status").asText(), failed.toString());
+        assertTrue(json.readTree(get("/courses").body()).isEmpty());
+
+        saveGenerationInput("Software developer");
+        HttpResponse<String> retry = post("/course-jobs/" + jobId + "/retry",
+                Map.of("requestId", UUID.randomUUID().toString()), csrf());
+        assertEquals(202, retry.statusCode(), retry.body());
+        long retryId = json.readTree(retry.body()).path("id").asLong();
+        assertEquals("SUCCEEDED", awaitCourseJob(retryId).path("status").asText());
+    }
+
+    private int registerAndSignIn() throws Exception {
+        HttpResponse<String> registration = post("/auth/register", registration(""), csrf());
+        assertEquals(201, registration.statusCode(), registration.body());
+        assertEquals(200, login(username, PASSWORD).statusCode());
+        return json.readTree(registration.body()).path("id").asInt();
+    }
+
+    private void saveGenerationInput(String context) throws Exception {
+        String input = json.writeValueAsString(Map.of("interviewType", "JOB", "language", "ENGLISH",
+                "timeline", "LATER", "context", context));
+        HttpResponse<String> saved = savePreferences(input, null);
+        assertEquals(200, saved.statusCode(), saved.body());
+    }
+
+    private JsonNode awaitCourseJob(long id) throws Exception {
+        for (int attempt = 0; attempt < 100; attempt++) {
+            HttpResponse<String> response = get("/course-jobs/" + id);
+            assertEquals(200, response.statusCode(), response.body());
+            JsonNode job = json.readTree(response.body());
+            String status = job.path("status").asText();
+            if (!"QUEUED".equals(status) && !"RUNNING".equals(status)) {
+                return job;
+            }
+            Thread.sleep(200);
+        }
+        throw new AssertionError("Course generation did not finish.");
     }
 
     @Test

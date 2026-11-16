@@ -2,15 +2,18 @@ package com.interviewai.desktop.navigation;
 
 import com.interviewai.desktop.api.AccountSummary;
 import com.interviewai.desktop.api.AuthApi;
+import com.interviewai.desktop.api.CourseJobApi;
 import com.interviewai.desktop.api.DashboardApi;
 import com.interviewai.desktop.api.HealthApi;
 import com.interviewai.desktop.api.OnboardingApi;
+import com.interviewai.desktop.api.dto.CourseJobStatus;
 import com.interviewai.desktop.feature.auth.AccountController;
 import com.interviewai.desktop.feature.auth.LoginController;
 import com.interviewai.desktop.feature.auth.RegisterController;
 import com.interviewai.desktop.feature.connection.ConnectionController;
 import com.interviewai.desktop.feature.dashboard.DashboardController;
 import com.interviewai.desktop.feature.onboarding.OnboardingController;
+import com.interviewai.desktop.feature.onboarding.CourseWaitingController;
 import javafx.fxml.FXMLLoader;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
@@ -27,16 +30,18 @@ public class DesktopNavigator {
     private final HealthApi healthApi;
     private final DashboardApi dashboardApi;
     private final OnboardingApi onboardingApi;
+    private final CourseJobApi courseJobs;
     private final Executor executor;
     private final String backendAddress;
 
     public DesktopNavigator(Stage stage, AuthApi authApi, HealthApi healthApi, DashboardApi dashboardApi, Executor executor,
-            OnboardingApi onboardingApi, String backendAddress) {
+            OnboardingApi onboardingApi, CourseJobApi courseJobs, String backendAddress) {
         this.stage = stage;
         this.authApi = authApi;
         this.healthApi = healthApi;
         this.dashboardApi = dashboardApi;
         this.onboardingApi = onboardingApi;
+        this.courseJobs = courseJobs;
         this.executor = executor;
         this.backendAddress = backendAddress;
     }
@@ -62,7 +67,11 @@ public class DesktopNavigator {
     }
 
     public void showOnboarding(AccountSummary account) {
-        show("onboarding-view.fxml", new OnboardingController(account, onboardingApi, this, executor));
+        show("onboarding-view.fxml", new OnboardingController(account, onboardingApi, courseJobs, this, executor));
+    }
+
+    public void showCourseJob(AccountSummary account, CourseJobStatus job) {
+        show("course-waiting-view.fxml", new CourseWaitingController(account, courseJobs, this, executor, job));
     }
 
     public void showConnection() {

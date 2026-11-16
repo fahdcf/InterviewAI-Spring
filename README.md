@@ -10,7 +10,7 @@ InterviewAI is a desktop interview preparation app. This repository contains the
 
 ## Current milestone
 
-The JavaFX client can register, sign in by username or email, and sign out. Candidates can browse their courses, preview chapters, see XP and streaks, and save the chapter they want to return to after signing in again. **Interview preferences** saves interview details and an optional PDF, DOCX, or DOC CV. The backend keeps up to 4,000 characters of extracted text until the user replaces or removes it. Course generation and answering questions are upcoming steps in the migration plan.
+The JavaFX client supports registration, sign-in, sign-out, course browsing, chapter selection, XP and streaks. **Interview preferences** saves interview details and an optional PDF, DOCX, or DOC CV. **Generate courses** starts a background job that produces one technical and one soft-skills course. **Generation status** reopens progress after leaving the waiting screen. The backend saves both courses together after validating every chapter and question.
 
 - `backend/` contains the Spring Boot controllers, account service, JDBC repository, security configuration and Flyway migrations.
 - `desktop/` contains the JavaFX screens, controllers and HTTP client.
@@ -28,6 +28,8 @@ In PowerShell, set the database credentials and start the backend.
 $env:DB_URL = 'jdbc:mysql://127.0.0.1:3306/interviewai_spring'
 $env:DB_USER = 'interviewai'
 $env:DB_PASSWORD = Read-Host 'MySQL password' -MaskInput
+# Optional for browsing existing courses. Required to generate new ones.
+$env:GEMINI_API_KEY = Read-Host 'Gemini API key' -MaskInput
 .\mvnw.cmd -pl backend spring-boot:run
 ```
 
@@ -47,12 +49,14 @@ The desktop defaults to `http://127.0.0.1:8080`. Set `INTERVIEWAI_API_URL` in th
 
 Choose **Create account**, then sign in with the username or the optional email. New accounts have the candidate role. Imported administrator roles and user-management permissions are recognized at sign-in.
 
+The backend sends interview preferences and up to 4,000 characters of saved CV text to Gemini for generation. You can remove the saved CV in **Interview preferences**. The default endpoint uses Gemini 3.5 Flash. Set `GEMINI_API_URL` to use a different supported GenerateContent endpoint. Run one backend process per database so it can recover interrupted generation jobs on startup. [Gemini API documentation](https://ai.google.dev/api/generate-content)
+
 ## Verify the build
 
 ```powershell
 .\mvnw.cmd clean verify
 ```
 
-The default test run uses a disposable in-memory database for backend HTTP integration tests. It covers registration, duplicate identifiers, CSRF, sessions, suspended accounts, roles and legacy password upgrades. Desktop tests cover connection responses.
+The default test run uses a disposable in-memory database and a local Gemini test server for backend HTTP integration tests. It covers accounts, sessions, course browsing, onboarding, generation, and generation retry. Desktop tests cover connection responses.
 
 To run the backend tests against a separate MySQL database, configure `TEST_DB_URL`, `TEST_DB_USER` and `TEST_DB_PASSWORD`, then run `.\mvnw.cmd -pl backend test`. Use a disposable database since the suite inserts test accounts and changes their roles and status.

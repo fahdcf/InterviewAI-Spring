@@ -2,6 +2,7 @@ package com.interviewai.desktop;
 
 import com.interviewai.desktop.api.ApiClient;
 import com.interviewai.desktop.api.AuthApi;
+import com.interviewai.desktop.api.CourseJobApi;
 import com.interviewai.desktop.api.DashboardApi;
 import com.interviewai.desktop.api.HealthApi;
 import com.interviewai.desktop.api.OnboardingApi;
@@ -40,7 +41,7 @@ public class DesktopApplication extends Application {
             ApiClient apiClient = new ApiClient(URI.create(backendAddress), httpClient);
             DesktopNavigator navigator = new DesktopNavigator(stage, new AuthApi(apiClient),
                     new HealthApi(apiClient), new DashboardApi(apiClient), executor, new OnboardingApi(apiClient),
-                    backendAddress);
+                    new CourseJobApi(apiClient), backendAddress);
             navigator.showLogin("");
             stage.setMinWidth(420);
             stage.setMinHeight(440);

@@ -48,6 +48,7 @@
             <HBox spacing="10">
                 <Button text="Refresh" onAction="#refresh" styleClass="button-link"/>
                 <Button text="Interview preferences" onAction="#openOnboarding" styleClass="button-link"/>
+                <Button text="Generation status" onAction="#openCourseJob" styleClass="button-link"/>
                 <Button fx:id="logoutButton" text="Sign out" onAction="#logout" styleClass="button-link"/>
             </HBox>
         </VBox>

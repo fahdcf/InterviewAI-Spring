@@ -38,6 +38,7 @@
                wrapText="true"/>
         <HBox spacing="10">
             <Button text="Save preferences" onAction="#save" styleClass="btn-primary-blue" defaultButton="true"/>
+            <Button text="Generate courses" onAction="#generate" styleClass="btn-primary-blue"/>
             <Button text="Back to dashboard" onAction="#back" styleClass="button-link"/>
         </HBox>
         <Label fx:id="statusLabel" styleClass="subtitle-dark" wrapText="true"/>
