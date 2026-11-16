@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.Button?>
+<?import javafx.scene.control.ComboBox?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.control.ListView?>
+<?import javafx.scene.layout.BorderPane?>
+<?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.VBox?>
+
+<BorderPane fx:id="dashboardPane" xmlns="http://javafx.com/javafx/21"
+            xmlns:fx="http://javafx.com/fxml/1"
+            fx:controller="com.interviewai.desktop.feature.dashboard.DashboardController"
+            styleClass="dark-root" stylesheets="@../css/connection.css">
+    <padding><Insets top="20" right="24" bottom="20" left="24"/></padding>
+    <top>
+        <VBox spacing="8">
+            <Label fx:id="welcomeLabel" styleClass="title-dark" wrapText="true"/>
+            <HBox spacing="20">
+                <Label fx:id="xpLabel" styleClass="subtitle-dark"/>
+                <Label fx:id="streakLabel" styleClass="subtitle-dark"/>
+            </HBox>
+            <ComboBox fx:id="coursePicker" promptText="Select a course"
+                      onAction="#selectCourse" maxWidth="Infinity"/>
+            <Label fx:id="courseProgress" styleClass="subtitle-dark"/>
+        </VBox>
+    </top>
+    <left>
+        <VBox spacing="8" prefWidth="225">
+            <padding><Insets top="16" right="16" bottom="12" left="0"/></padding>
+            <Label text="Chapters" styleClass="subtitle-dark"/>
+            <ListView fx:id="chapterList" VBox.vgrow="ALWAYS"/>
+        </VBox>
+    </left>
+    <center>
+        <VBox spacing="14">
+            <padding><Insets top="16" right="0" bottom="12" left="0"/></padding>
+            <Label fx:id="chapterName" styleClass="title-dark" wrapText="true"/>
+            <Label fx:id="chapterDescription" styleClass="subtitle-dark" wrapText="true"/>
+            <Button fx:id="saveButton" text="Save chapter" onAction="#saveChapter"
+                    styleClass="btn-primary-blue"/>
+        </VBox>
+    </center>
+    <bottom>
+        <VBox spacing="6">
+            <Label fx:id="statusLabel" styleClass="subtitle-dark" wrapText="true"/>
+            <HBox spacing="10">
+                <Button text="Refresh" onAction="#refresh" styleClass="button-link"/>
+                <Button fx:id="logoutButton" text="Sign out" onAction="#logout" styleClass="button-link"/>
+            </HBox>
+        </VBox>
+    </bottom>
+</BorderPane>

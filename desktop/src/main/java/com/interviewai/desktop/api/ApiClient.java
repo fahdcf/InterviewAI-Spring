@@ -42,15 +42,25 @@ public class ApiClient {
         return objectMapper.readTree(send(request));
     }
 
-    public <T> T postJson(String path, Object body, String csrfHeader, String csrfToken, Class<T> responseType)
+    public <T> T readJson(String path, Class<T> responseType) throws IOException, InterruptedException {
+        return objectMapper.treeToValue(getJson(path), responseType);
+    }
+
+    public <T> T writeJson(String method, String path, Object body, Class<T> responseType)
             throws IOException, InterruptedException {
+        JsonNode csrf = getJson("/api/v1/auth/csrf");
+        String csrfHeader = csrf.path("headerName").asText();
+        String csrfToken = csrf.path("token").asText();
+        if (csrfHeader.isBlank() || csrfToken.isBlank()) {
+            throw new IOException("The backend did not return a request token.");
+        }
         String requestBody = objectMapper.writeValueAsString(body);
         HttpRequest request = HttpRequest.newBuilder(baseUrl.resolve(path))
                 .timeout(Duration.ofSeconds(5))
                 .header("Accept", "application/json")
                 .header("Content-Type", "application/json")
                 .header(csrfHeader, csrfToken)
-                .POST(HttpRequest.BodyPublishers.ofString(requestBody))
+                .method(method, HttpRequest.BodyPublishers.ofString(requestBody))
                 .build();
         String response = send(request);
         if (responseType == Void.class) {
@@ -76,6 +86,6 @@ public class ApiClient {
                 // A proxy can return an HTML error page.
             }
         }
-        throw new ApiException(message);
+        throw new ApiException(status, message);
     }
 }

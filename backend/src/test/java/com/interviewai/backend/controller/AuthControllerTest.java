@@ -75,6 +75,9 @@ class AuthControllerTest {
         assertNotEquals(initialSession, sessionId());
         assertEquals(403, post("/auth/logout", Map.of(), originalCsrf).statusCode());
         assertEquals(200, get("/me").statusCode());
+        JsonNode emptyDashboard = json.readTree(get("/dashboard").body());
+        assertTrue(emptyDashboard.path("courses").isEmpty());
+        assertTrue(emptyDashboard.path("activeChapterId").isNull());
         assertEquals(403, get("/admin/users").statusCode());
         assertEquals(204, post("/auth/logout", Map.of(), csrf()).statusCode());
         assertEquals(401, get("/me").statusCode());
@@ -159,6 +162,74 @@ class AuthControllerTest {
 
     private HttpResponse<String> login(String identifier, String password) throws Exception {
         return post("/auth/login", Map.of("identifier", identifier, "password", password), csrf());
+    }
+
+    @Test
+    void dashboardRestoresOnlyAnOwnedCourseAndChapter() throws Exception {
+        HttpResponse<String> created = post("/auth/register", registration(""), csrf());
+        assertEquals(201, created.statusCode(), created.body());
+        int userId = json.readTree(created.body()).path("id").asInt();
+        String otherUsername = username + "-other";
+        jdbc.update("INSERT INTO users (username) VALUES (?)", otherUsername);
+        int otherUser = jdbc.queryForObject("SELECT id FROM users WHERE username = ?", Integer.class, otherUsername);
+        int technical = insertCourse(userId, "Technical");
+        int softSkills = insertCourse(userId, "Soft skills");
+        int otherCourse = insertCourse(otherUser, "Private course");
+        int chapter = insertChapter(technical, "First chapter");
+        int softSkillsChapter = insertChapter(softSkills, "Second chapter");
+        jdbc.update("""
+                INSERT INTO interview_prep (user_id, technical_course_id, softskills_course_id)
+                VALUES (?, ?, ?)
+                """, userId, technical, softSkills);
+        jdbc.update("INSERT INTO progress (user_id, course_id, xp) VALUES (?, ?, 42)", userId, technical);
+        jdbc.update("INSERT INTO questions (chapter_id, question, status) VALUES (?, 'Example?', 'INCORRECT')", chapter);
+
+        assertEquals(200, login(username, PASSWORD).statusCode());
+        assertEquals(2, json.readTree(get("/courses").body()).size());
+        JsonNode first = json.readTree(get("/dashboard").body());
+        assertEquals(technical, first.path("activeCourseId").asInt());
+        assertEquals(chapter, first.path("activeChapterId").asInt());
+        assertEquals(1, first.path("chapters").get(0).path("answeredCount").asInt());
+        assertEquals(42, first.path("totalXp").asInt());
+        assertEquals(404, get("/courses/" + otherCourse + "/chapters").statusCode());
+        assertEquals(404, saveLocation(otherCourse, null).statusCode());
+        assertEquals(404, saveLocation(technical, softSkillsChapter).statusCode());
+        assertEquals(204, saveLocation(softSkills, softSkillsChapter).statusCode());
+        assertEquals(204, post("/auth/logout", Map.of(), csrf()).statusCode());
+        assertEquals(200, login(username, PASSWORD).statusCode());
+
+        JsonNode restored = json.readTree(get("/dashboard").body());
+        assertEquals(softSkills, restored.path("activeCourseId").asInt());
+        assertEquals(softSkillsChapter, restored.path("activeChapterId").asInt());
+        jdbc.update("UPDATE generated_courses SET status = 'ARCHIVED' WHERE id = ?", softSkills);
+        JsonNode fallback = json.readTree(get("/dashboard").body());
+        assertEquals(technical, fallback.path("activeCourseId").asInt());
+        assertEquals(chapter, fallback.path("activeChapterId").asInt());
+    }
+
+    private int insertCourse(int userId, String title) {
+        jdbc.update("INSERT INTO generated_courses (user_id, course_title, status) VALUES (?, ?, 'ACTIVE')",
+                userId, title);
+        return jdbc.queryForObject("SELECT id FROM generated_courses WHERE user_id = ? AND course_title = ?",
+                Integer.class, userId, title);
+    }
+
+    private int insertChapter(int courseId, String name) {
+        jdbc.update("INSERT INTO chapters (course_id, chapter_number, name) VALUES (?, 1, ?)", courseId, name);
+        return jdbc.queryForObject("SELECT id FROM chapters WHERE course_id = ?", Integer.class, courseId);
+    }
+
+    private HttpResponse<String> saveLocation(int courseId, Integer chapterId) throws Exception {
+        Map<String, Integer> body = new java.util.HashMap<>();
+        body.put("courseId", courseId);
+        body.put("chapterId", chapterId);
+        JsonNode csrf = csrf();
+        HttpRequest request = HttpRequest.newBuilder(uri("/me/navigation"))
+                .header("Content-Type", "application/json")
+                .header(csrf.path("headerName").asText(), csrf.path("token").asText())
+                .PUT(HttpRequest.BodyPublishers.ofString(json.writeValueAsString(body)))
+                .build();
+        return client.send(request, HttpResponse.BodyHandlers.ofString());
     }
 
     private Map<String, String> registration(String email) {

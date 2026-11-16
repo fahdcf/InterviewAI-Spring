@@ -4,7 +4,14 @@ import java.io.IOException;
 
 public class ApiException extends IOException {
 
-    public ApiException(String message) {
+    private final int status;
+
+    public ApiException(int status, String message) {
         super(message);
+        this.status = status;
+    }
+
+    public int getStatus() {
+        return status;
     }
 }

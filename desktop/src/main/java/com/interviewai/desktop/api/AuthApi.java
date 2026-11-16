@@ -1,7 +1,5 @@
 package com.interviewai.desktop.api;
 
-import com.fasterxml.jackson.databind.JsonNode;
-
 import java.io.IOException;
 import java.util.Map;
 
@@ -35,12 +33,6 @@ public class AuthApi {
 
     private <T> T post(String path, Map<String, String> body, Class<T> responseType)
             throws IOException, InterruptedException {
-        JsonNode csrf = apiClient.getJson("/api/v1/auth/csrf");
-        String header = csrf.path("headerName").asText();
-        String token = csrf.path("token").asText();
-        if (header.isBlank() || token.isBlank()) {
-            throw new IOException("The backend did not return a sign-in token.");
-        }
-        return apiClient.postJson(path, body, header, token, responseType);
+        return apiClient.writeJson("POST", path, body, responseType);
     }
 }
