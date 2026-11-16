@@ -10,7 +10,7 @@ InterviewAI is a desktop interview preparation app. This repository contains the
 
 ## Current milestone
 
-The JavaFX client can register, sign in by username or email, and sign out. Candidates can browse their courses, preview chapters, see XP and streaks, and save the chapter they want to return to after signing in again. Course generation and answering questions are upcoming steps in the migration plan.
+The JavaFX client can register, sign in by username or email, and sign out. Candidates can browse their courses, preview chapters, see XP and streaks, and save the chapter they want to return to after signing in again. **Interview preferences** saves interview details and an optional PDF, DOCX, or DOC CV. The backend keeps up to 4,000 characters of extracted text until the user replaces or removes it. Course generation and answering questions are upcoming steps in the migration plan.
 
 - `backend/` contains the Spring Boot controllers, account service, JDBC repository, security configuration and Flyway migrations.
 - `desktop/` contains the JavaFX screens, controllers and HTTP client.

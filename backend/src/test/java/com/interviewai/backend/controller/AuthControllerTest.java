@@ -165,6 +165,58 @@ class AuthControllerTest {
     }
 
     @Test
+    void onboardingSavesPreferencesAndOnlyKeepsTheSignedInUsersCvText() throws Exception {
+        assertEquals(401, get("/me/onboarding").statusCode());
+        assertEquals(201, post("/auth/register", registration(""), csrf()).statusCode());
+        assertEquals(200, login(username, PASSWORD).statusCode());
+        assertEquals(204, get("/me/onboarding").statusCode());
+
+        String preferences = """
+                {"interviewType":"JOB","language":"ENGLISH","timeline":"THIS_WEEK",
+                 "context":"Software developer","description":"Backend interview"}
+                """;
+        HttpResponse<String> saved = savePreferences(preferences, null);
+        assertEquals(200, saved.statusCode(), saved.body());
+        assertFalse(json.readTree(saved.body()).path("hasCv").asBoolean());
+        assertEquals("Backend interview", json.readTree(get("/me/onboarding").body()).path("description").asText());
+
+        java.io.ByteArrayOutputStream cv = new java.io.ByteArrayOutputStream();
+        try (org.apache.poi.xwpf.usermodel.XWPFDocument document = new org.apache.poi.xwpf.usermodel.XWPFDocument()) {
+            document.createParagraph().createRun().setText("Synthetic resume for integration testing.");
+            document.write(cv);
+        }
+        HttpResponse<String> uploaded = savePreferences(preferences, cv.toByteArray());
+        assertEquals(200, uploaded.statusCode(), uploaded.body());
+        assertTrue(json.readTree(uploaded.body()).path("hasCv").asBoolean());
+        assertFalse(uploaded.body().contains("Synthetic resume"));
+        assertEquals(400, savePreferences(preferences, "invalid".getBytes(StandardCharsets.UTF_8)).statusCode());
+        assertTrue(json.readTree(get("/me/onboarding").body()).path("hasCv").asBoolean());
+
+        String remove = preferences.strip().replace("}", ",\"removeCv\":true}");
+        assertEquals(200, savePreferences(remove, null).statusCode());
+        assertFalse(json.readTree(get("/me/onboarding").body()).path("hasCv").asBoolean());
+    }
+
+    private HttpResponse<String> savePreferences(String preferences, byte[] cv) throws Exception {
+        String boundary = "interviewai-test";
+        java.util.List<byte[]> parts = new java.util.ArrayList<>();
+        parts.add(("--" + boundary + "\r\nContent-Disposition: form-data; name=\"preferences\"\r\n"
+                + "Content-Type: application/json\r\n\r\n" + preferences).getBytes(StandardCharsets.UTF_8));
+        if (cv != null) {
+            parts.add(("\r\n--" + boundary + "\r\nContent-Disposition: form-data; name=\"cv\"; filename=\"cv.docx\""
+                    + "\r\nContent-Type: application/octet-stream\r\n\r\n").getBytes(StandardCharsets.UTF_8));
+            parts.add(cv);
+        }
+        parts.add(("\r\n--" + boundary + "--\r\n").getBytes(StandardCharsets.UTF_8));
+        JsonNode token = csrf();
+        HttpRequest request = HttpRequest.newBuilder(uri("/me/onboarding"))
+                .header("Content-Type", "multipart/form-data; boundary=" + boundary)
+                .header(token.path("headerName").asText(), token.path("token").asText())
+                .POST(HttpRequest.BodyPublishers.ofByteArrays(parts)).build();
+        return client.send(request, HttpResponse.BodyHandlers.ofString());
+    }
+
+    @Test
     void dashboardRestoresOnlyAnOwnedCourseAndChapter() throws Exception {
         HttpResponse<String> created = post("/auth/register", registration(""), csrf());
         assertEquals(201, created.statusCode(), created.body());

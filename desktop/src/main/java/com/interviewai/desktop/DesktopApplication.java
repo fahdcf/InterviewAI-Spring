@@ -4,6 +4,7 @@ import com.interviewai.desktop.api.ApiClient;
 import com.interviewai.desktop.api.AuthApi;
 import com.interviewai.desktop.api.DashboardApi;
 import com.interviewai.desktop.api.HealthApi;
+import com.interviewai.desktop.api.OnboardingApi;
 import com.interviewai.desktop.navigation.DesktopNavigator;
 import javafx.application.Application;
 import javafx.scene.control.Alert;
@@ -38,7 +39,8 @@ public class DesktopApplication extends Application {
             stage.setTitle("InterviewAI");
             ApiClient apiClient = new ApiClient(URI.create(backendAddress), httpClient);
             DesktopNavigator navigator = new DesktopNavigator(stage, new AuthApi(apiClient),
-                    new HealthApi(apiClient), new DashboardApi(apiClient), executor, backendAddress);
+                    new HealthApi(apiClient), new DashboardApi(apiClient), executor, new OnboardingApi(apiClient),
+                    backendAddress);
             navigator.showLogin("");
             stage.setMinWidth(420);
             stage.setMinHeight(440);

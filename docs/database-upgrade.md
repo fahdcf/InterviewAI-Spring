@@ -1,13 +1,13 @@
 # Database setup and upgrade
 
-The backend uses MySQL 8.4 and Flyway. Set `DB_URL`, `DB_USER` and `DB_PASSWORD` in the backend process environment. Use an empty MySQL schema for a fresh setup. The application applies V1 to create the legacy tables and seed the reference roles and permissions, then V2 to make account email addresses unique.
+The backend uses MySQL 8.4 and Flyway. Set `DB_URL`, `DB_USER` and `DB_PASSWORD` in the backend process environment. Use an empty MySQL schema for a fresh setup. Flyway applies V1 for the base schema, V2 for unique account emails, and V3 for saved interview descriptions and extracted CV text.
 
 ## Upgrading a copy of the original database
 
 1. Make a verified backup of the original database and restore it into a separate development schema. Connect the new backend to the restored copy.
 2. Compare the tables, columns and foreign keys in the copy with [V1](../backend/src/main/resources/db/migration/V1__initial_schema.sql). Some older installations may have missing columns that the original desktop added on startup. Reconcile those differences before recording the baseline.
 3. Review the result of the checks below. Resolve duplicate real email addresses with the affected account owners. Convert legacy blank email placeholders to `NULL` in the copy if they represent omitted email addresses. Review email addresses that match a different account's username. The backend checks for a username match first at sign-in, using the database collation.
-4. After verifying the copied schema is at V1, start the backend once with `SPRING_FLYWAY_BASELINE_ON_MIGRATE=true` and `SPRING_FLYWAY_BASELINE_VERSION=1`. Flyway records the existing schema at V1 and applies V2. Remove the baseline environment variables for subsequent runs.
+4. After verifying the copied schema is at V1, start the backend once with `SPRING_FLYWAY_BASELINE_ON_MIGRATE=true` and `SPRING_FLYWAY_BASELINE_VERSION=1`. Flyway records the existing schema at V1 and applies later migrations. Remove the baseline environment variables for subsequent runs.
 5. Compare users, role assignments, course and chapter IDs, last-used navigation, progress rows and timestamps, goal starting values, and quest markers before and after the migration. Sign in with a representative account and verify its role. A successful sign-in upgrades a legacy SHA-256 hash to BCrypt when the password fits BCrypt's 72-byte limit.
 
 ```sql

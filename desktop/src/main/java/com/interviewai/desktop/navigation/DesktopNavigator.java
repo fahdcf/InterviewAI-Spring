@@ -4,11 +4,13 @@ import com.interviewai.desktop.api.AccountSummary;
 import com.interviewai.desktop.api.AuthApi;
 import com.interviewai.desktop.api.DashboardApi;
 import com.interviewai.desktop.api.HealthApi;
+import com.interviewai.desktop.api.OnboardingApi;
 import com.interviewai.desktop.feature.auth.AccountController;
 import com.interviewai.desktop.feature.auth.LoginController;
 import com.interviewai.desktop.feature.auth.RegisterController;
 import com.interviewai.desktop.feature.connection.ConnectionController;
 import com.interviewai.desktop.feature.dashboard.DashboardController;
+import com.interviewai.desktop.feature.onboarding.OnboardingController;
 import javafx.fxml.FXMLLoader;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
@@ -24,15 +26,17 @@ public class DesktopNavigator {
     private final AuthApi authApi;
     private final HealthApi healthApi;
     private final DashboardApi dashboardApi;
+    private final OnboardingApi onboardingApi;
     private final Executor executor;
     private final String backendAddress;
 
     public DesktopNavigator(Stage stage, AuthApi authApi, HealthApi healthApi, DashboardApi dashboardApi, Executor executor,
-            String backendAddress) {
+            OnboardingApi onboardingApi, String backendAddress) {
         this.stage = stage;
         this.authApi = authApi;
         this.healthApi = healthApi;
         this.dashboardApi = dashboardApi;
+        this.onboardingApi = onboardingApi;
         this.executor = executor;
         this.backendAddress = backendAddress;
     }
@@ -55,6 +59,10 @@ public class DesktopNavigator {
 
     public void showDashboard(AccountSummary account) {
         show("dashboard-view.fxml", new DashboardController(account, authApi, dashboardApi, this, executor));
+    }
+
+    public void showOnboarding(AccountSummary account) {
+        show("onboarding-view.fxml", new OnboardingController(account, onboardingApi, this, executor));
     }
 
     public void showConnection() {

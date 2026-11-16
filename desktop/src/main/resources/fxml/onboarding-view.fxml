@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.Button?>
+<?import javafx.scene.control.CheckBox?>
+<?import javafx.scene.control.ComboBox?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.control.ScrollPane?>
+<?import javafx.scene.control.TextArea?>
+<?import javafx.scene.control.TextField?>
+<?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.VBox?>
+
+<ScrollPane fitToWidth="true" xmlns="http://javafx.com/javafx/21"
+            xmlns:fx="http://javafx.com/fxml/1"
+            fx:controller="com.interviewai.desktop.feature.onboarding.OnboardingController"
+            stylesheets="@../css/connection.css">
+    <VBox fx:id="form" spacing="10" styleClass="dark-root">
+        <padding><Insets top="20" right="28" bottom="20" left="28"/></padding>
+        <Label text="Interview preferences" styleClass="title-dark"/>
+        <Label text="Interview type" styleClass="subtitle-dark" labelFor="${interviewType}"/>
+        <ComboBox fx:id="interviewType" maxWidth="Infinity"/>
+        <Label text="Language" styleClass="subtitle-dark" labelFor="${language}"/>
+        <ComboBox fx:id="language" maxWidth="Infinity"/>
+        <Label text="Timeline" styleClass="subtitle-dark" labelFor="${timeline}"/>
+        <ComboBox fx:id="timeline" maxWidth="Infinity"/>
+        <Label text="Interview context" styleClass="subtitle-dark" labelFor="${context}"/>
+        <TextField fx:id="context" promptText="Role, company, or programme" styleClass="input-dark"/>
+        <Label text="Additional details (optional)" styleClass="subtitle-dark" labelFor="${description}"/>
+        <TextArea fx:id="description" prefRowCount="3" wrapText="true"/>
+        <Label text="CV (optional, up to 5 MB)" styleClass="subtitle-dark"/>
+        <HBox spacing="10" alignment="CENTER_LEFT">
+            <Button text="Choose CV" onAction="#chooseCv"/>
+            <Label fx:id="cvStatus" styleClass="subtitle-dark" wrapText="true"/>
+        </HBox>
+        <CheckBox fx:id="removeCv" text="Remove saved CV" styleClass="subtitle-dark"/>
+        <Label text="Saved CV text can be sent to the course generation provider." styleClass="subtitle-dark"
+               wrapText="true"/>
+        <HBox spacing="10">
+            <Button text="Save preferences" onAction="#save" styleClass="btn-primary-blue" defaultButton="true"/>
+            <Button text="Back to dashboard" onAction="#back" styleClass="button-link"/>
+        </HBox>
+        <Label fx:id="statusLabel" styleClass="subtitle-dark" wrapText="true"/>
+    </VBox>
+</ScrollPane>
