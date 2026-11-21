@@ -658,7 +658,7 @@ Each exit gate also includes a readability walkthrough. A junior engineer should
 - [x] Run the final CI build, repository/HTTP integration suite, UI smoke suite and packaged-app acceptance checks.
 - [x] Complete a final readability review of login, course generation, answer submission and quest claiming. Record a short plain-language explanation of each flow in the relevant setup or developer notes.
 - [x] Review the parity checklist, deliberate fixes and deployment instructions against the original objective.
-- [ ] Publish the backend JAR, desktop ZIP and SHA-256 checksums in the new repository and tag the verified implementation release `v1.0.0`, noting the skipped external acceptance checks.
+- [x] Publish the backend JAR, desktop ZIP and SHA-256 checksums in the new repository and tag the verified implementation release `v1.0.0`, noting the skipped external acceptance checks.
 - [x] Include source provenance, both developers' credit, supported functionality, setup instructions and exact tested versions in the new README.
 - [x] Record the final source SHA, migration release SHA and database migration version.
 

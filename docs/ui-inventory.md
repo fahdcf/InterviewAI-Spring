@@ -276,6 +276,18 @@ Controller com.interviewai.controller.UserManagementController.
 | Button | resetXPBtn |  | onAction=#onResetXP |
 | Button | resetProgressBtn |  | onAction=#onResetProgress |
 
+### components/AdminSidebar.fxml
+
+Controller com.interviewai.controller.AdminSidebarController.
+
+| Control | ID | Navigation action |
+| --- | --- | --- |
+| Button | dashboardBtn | onNavigateDashboard |
+| Button | userManagementBtn | onNavigateUserManagement |
+| Button | coursesBtn | onNavigateCourses |
+| Button | profileBtn | onNavigateProfile |
+| Button |  | onLogout |
+
 ## Migrated desktop
 
 ### admin-view.fxml

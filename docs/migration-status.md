@@ -1,6 +1,6 @@
 # Migration status
 
-The JavaFX desktop and Spring Boot backend are implemented and packaged for version `1.0.0`. Live-provider and remote-server acceptance are skipped at the user's request on 21 November 2026.
+The JavaFX desktop and Spring Boot backend are published as [version 1.0.0](https://github.com/fahdcf/InterviewAI-Spring/releases/tag/v1.0.0). The exact source revision, workflow and package hashes are in the [release record](releases/1.0.0.md). Live-provider and remote-server acceptance are skipped at the user's request on 21 November 2026.
 
 | Plan group | Result | Verification |
 | --- | --- | --- |
