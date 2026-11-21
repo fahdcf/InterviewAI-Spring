@@ -1,0 +1,59 @@
+name: interviewai
+
+services:
+  database:
+    image: mysql:8.4.13
+    environment:
+      MYSQL_RANDOM_ROOT_PASSWORD: "yes"
+      MYSQL_DATABASE: interviewai
+      MYSQL_USER: interviewai
+      MYSQL_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in deploy/.env}
+    volumes:
+      - database-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "--silent"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+
+  backend:
+    build:
+      context: ..
+      dockerfile: backend/Dockerfile
+    environment:
+      DB_URL: jdbc:mysql://database:3306/interviewai?sslMode=DISABLED&allowPublicKeyRetrieval=true
+      DB_USER: interviewai
+      DB_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in deploy/.env}
+      SESSION_COOKIE_SECURE: "true"
+      APP_TIME_ZONE: ${APP_TIME_ZONE:-Africa/Casablanca}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+      GEMINI_API_URL: ${GEMINI_API_URL:-https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent}
+      OPENROUTER_API_URL: ${OPENROUTER_API_URL:-https://openrouter.ai/api/v1/chat/completions}
+      OPENROUTER_MODEL: ${OPENROUTER_MODEL:-openai/gpt-4.1-mini}
+    depends_on:
+      database:
+        condition: service_healthy
+    stop_grace_period: 15s
+    restart: unless-stopped
+
+  proxy:
+    image: caddy:2.10.2
+    environment:
+      APP_HOST: ${APP_HOST:-localhost}
+    ports:
+      - "${PROXY_BIND:-127.0.0.1}:${HTTP_PORT:-8081}:80"
+      - "${PROXY_BIND:-127.0.0.1}:${HTTPS_PORT:-8443}:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - proxy-data:/data
+      - proxy-config:/config
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+volumes:
+  database-data:
+  proxy-data:
+  proxy-config:
