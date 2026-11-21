@@ -1,0 +1,4 @@
+empty.doc is the blank Word template from Apache POI test data.
+Source: https://github.com/apache/poi/blob/trunk/test-data/document/empty.doc
+Apache License 2.0: https://www.apache.org/licenses/LICENSE-2.0
+The test inserts synthetic resume text into the template in memory.

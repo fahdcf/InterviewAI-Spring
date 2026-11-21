@@ -4,6 +4,9 @@ import org.apache.pdfbox.Loader;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.text.PDFTextStripper;
 import org.apache.poi.hwpf.HWPFDocument;
+import org.apache.poi.EncryptedDocumentException;
+import org.apache.poi.xwpf.usermodel.IBodyElement;
+import org.apache.poi.xwpf.usermodel.XWPFTable;
 import org.apache.poi.xwpf.usermodel.XWPFDocument;
 import org.apache.poi.xwpf.usermodel.XWPFParagraph;
 import org.springframework.http.HttpStatus;
@@ -21,6 +24,9 @@ public class CvTextExtractor {
     private static final int MAX_CHARACTERS = 4000;
 
     public String extract(MultipartFile file) {
+        if (file.getSize() > 5 * 1024 * 1024) {
+            throw new ResponseStatusException(HttpStatus.PAYLOAD_TOO_LARGE, "Choose a CV that is 5 MB or smaller.");
+        }
         String name = file.getOriginalFilename();
         String extension = name == null ? "" : name.toLowerCase(Locale.ROOT);
         String text;
@@ -36,7 +42,7 @@ public class CvTextExtractor {
             } else {
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Choose a PDF, DOCX, or DOC file.");
             }
-        } catch (IOException | IllegalArgumentException error) {
+        } catch (IOException | IllegalArgumentException | EncryptedDocumentException error) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "The CV could not be read.");
         }
 
@@ -63,8 +69,12 @@ public class CvTextExtractor {
     private String readDocx(MultipartFile file) throws IOException {
         try (InputStream input = file.getInputStream(); XWPFDocument document = new XWPFDocument(input)) {
             StringBuilder text = new StringBuilder();
-            for (XWPFParagraph paragraph : document.getParagraphs()) {
-                text.append(paragraph.getText()).append('\n');
+            for (IBodyElement element : document.getBodyElements()) {
+                if (element instanceof XWPFParagraph paragraph) {
+                    text.append(paragraph.getText()).append('\n');
+                } else if (element instanceof XWPFTable table) {
+                    text.append(table.getText()).append('\n');
+                }
                 if (text.length() >= MAX_CHARACTERS) {
                     break;
                 }
