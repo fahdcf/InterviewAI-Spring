@@ -27,11 +27,15 @@ public class ProviderFixtures {
                 ObjectMapper json = new ObjectMapper();
                 String prompt = json.readTree(exchange.getRequestBody())
                         .path("contents").path(0).path("parts").path(0).path("text").asText();
+                if (prompt.contains("UNAVAILABLE_MODEL")) {
+                    exchange.sendResponseHeaders(404, -1);
+                    return;
+                }
                 ObjectNode content = json.createObjectNode();
                 ArrayNode chapters = content.putArray("chapters");
                 if (prompt.contains("Generate a comprehensive interview preparation course outline")) {
                     boolean failSoftSkills = prompt.contains("FAIL_SOFT_SKILLS") && prompt.contains("Behavioural");
-                    content.put("course_title", "Generated preparation");
+                    content.put("course_title", prompt.contains("MISSING_CHOICES") ? "MISSING_CHOICES" : "Generated preparation");
                     for (int number = 1; number <= (failSoftSkills ? 2 : 12); number++) {
                         chapters.addObject().put("chapter_number", number)
                                 .put("name", "Chapter " + number).put("description", "Practice topics.");
@@ -48,7 +52,9 @@ public class ProviderFixtures {
                                     .put("correct_answer", "Example").put("explanation", "Sample explanation.");
                             if (multipleChoice) {
                                 ArrayNode choices = question.putArray("choices");
-                                for (String choice : List.of("Example", "Second", "Third", "Fourth")) {
+                                List<String> options = prompt.contains("MISSING_CHOICES")
+                                        ? List.of("Example", "Second", "Third") : List.of("Example", "Second", "Third", "Fourth");
+                                for (String choice : options) {
                                     choices.add(choice);
                                 }
                             }

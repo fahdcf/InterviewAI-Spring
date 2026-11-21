@@ -120,10 +120,56 @@ class AuthControllerTest {
         assertTrue(emptyDashboard.path("courses").isEmpty());
         assertTrue(emptyDashboard.path("activeChapterId").isNull());
         assertEquals(403, get("/admin/users").statusCode());
+        assertEquals(403, get("/admin/courses").statusCode());
+        assertEquals(403, get("/admin/overview").statusCode());
+        assertEquals(403, get("/admin/users/roles").statusCode());
         assertEquals(204, post("/auth/logout", Map.of(), csrf()).statusCode());
         assertEquals(401, get("/me").statusCode());
 
         assertEquals(200, login(username, PASSWORD).statusCode());
+    }
+
+    @Test
+    void simultaneousUsersKeepIndependentSessionsAndOwnedResources() throws Exception {
+        int firstUser = registerAndSignIn();
+        int firstCourse = insertCourse(firstUser, "First private course");
+        int firstChapter = insertChapter(firstCourse, "First chapter");
+        int firstQuestion = addQuestion(firstChapter, "First private question?", "MULTIPLE_CHOICE");
+        try (HttpClient secondClient = HttpClient.newBuilder().cookieHandler(new CookieManager()).build()) {
+            JsonNode anonymousToken = json.readTree(secondClient.send(
+                    HttpRequest.newBuilder(uri("/auth/csrf")).GET().build(),
+                    HttpResponse.BodyHandlers.ofString()).body());
+            String secondName = "second-" + UUID.randomUUID();
+            assertEquals(201, secondClient.send(writeRequest("POST", "/auth/register",
+                    Map.of("username", secondName, "password", PASSWORD), anonymousToken),
+                    HttpResponse.BodyHandlers.ofString()).statusCode());
+            HttpResponse<String> signedIn = secondClient.send(writeRequest("POST", "/auth/login",
+                    Map.of("identifier", secondName, "password", PASSWORD), anonymousToken),
+                    HttpResponse.BodyHandlers.ofString());
+            assertEquals(200, signedIn.statusCode(), signedIn.body());
+            int secondUser = json.readTree(signedIn.body()).path("id").asInt();
+            int secondCourse = insertCourse(secondUser, "Second private course");
+            int secondChapter = insertChapter(secondCourse, "Second chapter");
+            int secondQuestion = addQuestion(secondChapter, "Second private question?", "MULTIPLE_CHOICE");
+            assertEquals(404, secondClient.send(HttpRequest.newBuilder(
+                    uri("/chapters/" + firstChapter + "/questions")).GET().build(),
+                    HttpResponse.BodyHandlers.ofString()).statusCode());
+            assertEquals(404, get("/chapters/" + secondChapter + "/questions").statusCode());
+            JsonNode secondToken = json.readTree(secondClient.send(HttpRequest.newBuilder(uri("/auth/csrf")).GET().build(),
+                    HttpResponse.BodyHandlers.ofString()).body());
+            CompletableFuture<HttpResponse<String>> firstAnswer = client.sendAsync(writeRequest("POST",
+                    "/questions/" + firstQuestion + "/attempts", Map.of("mode", "LESSON", "answer", "Expected",
+                            "requestId", UUID.randomUUID().toString()), csrf()), HttpResponse.BodyHandlers.ofString());
+            HttpResponse<String> secondAnswer = secondClient.send(writeRequest("POST",
+                    "/questions/" + secondQuestion + "/attempts", Map.of("mode", "LESSON", "answer", "Expected",
+                            "requestId", UUID.randomUUID().toString()), secondToken), HttpResponse.BodyHandlers.ofString());
+            assertEquals(200, firstAnswer.get(5, TimeUnit.SECONDS).statusCode());
+            assertEquals(200, secondAnswer.statusCode(), secondAnswer.body());
+            assertEquals(10, json.readTree(get("/progress").body()).path("totalXp").asInt());
+            assertEquals(10, json.readTree(secondClient.send(HttpRequest.newBuilder(uri("/progress")).GET().build(),
+                    HttpResponse.BodyHandlers.ofString()).body()).path("totalXp").asInt());
+            assertEquals(firstUser, json.readTree(get("/me").body()).path("id").asInt());
+        }
     }
 
     @Test
@@ -326,6 +372,12 @@ class AuthControllerTest {
         JsonNode summary = json.readTree(get("/progress").body());
         assertEquals(390, summary.path("totalXp").asInt());
         assertEquals(1, summary.path("completedChapters").asInt());
+        HttpResponse<String> nextPair = post("/course-jobs", Map.of("requestId", UUID.randomUUID().toString()), csrf());
+        assertEquals(202, nextPair.statusCode(), nextPair.body());
+        JsonNode secondPair = awaitCourseJob(json.readTree(nextPair.body()).path("id").asLong());
+        assertEquals("SUCCEEDED", secondPair.path("status").asText(), secondPair.toString());
+        assertEquals(4, json.readTree(get("/courses").body()).size());
+        assertEquals(2, json.readTree(get("/dashboard").body()).path("pairs").size());
         assertEquals(204, post("/auth/logout", Map.of(), csrf()).statusCode());
         assertEquals(401, get("/progress").statusCode());
     }
@@ -355,6 +407,19 @@ class AuthControllerTest {
         assertEquals(201, registration.statusCode(), registration.body());
         assertEquals(200, login(username, PASSWORD).statusCode());
         return json.readTree(registration.body()).path("id").asInt();
+    }
+
+    @Test
+    void incompleteChoicesAndUnavailableModelsLeaveNoPartialCourses() throws Exception {
+        int userId = registerAndSignIn();
+        for (String input : List.of("MISSING_CHOICES", "UNAVAILABLE_MODEL")) {
+            saveGenerationInput(input);
+            HttpResponse<String> started = post("/course-jobs", Map.of("requestId", UUID.randomUUID().toString()), csrf());
+            assertEquals(202, started.statusCode(), started.body());
+            JsonNode failed = awaitCourseJob(json.readTree(started.body()).path("id").asLong());
+            assertEquals("FAILED", failed.path("status").asText(), failed.toString());
+            assertEquals(0, jdbc.queryForObject("SELECT COUNT(*) FROM generated_courses WHERE user_id = ?", Integer.class, userId));
+        }
     }
 
     private void saveGenerationInput(String context) throws Exception {
@@ -406,6 +471,7 @@ class AuthControllerTest {
                 Map.of("attemptId", incorrect.path("id").asText()), csrf()).statusCode());
         assertEquals(1, json.readTree(get("/courses/" + course + "/review").body()).size());
         assertEquals("COMPLETED", jdbc.queryForObject("SELECT status FROM chapters WHERE id = ?", String.class, chapter));
+        assertEquals("COMPLETED", jdbc.queryForObject("SELECT status FROM generated_courses WHERE id = ?", String.class, course));
         assertEquals(0, answer(second, "REVIEW", "Expected", UUID.randomUUID().toString(), 200)
                 .path("xpAwarded").asInt());
         assertTrue(json.readTree(get("/chapters/" + chapter + "/review").body()).isEmpty());
@@ -427,6 +493,11 @@ class AuthControllerTest {
         assertEquals("NOT_STARTED", jdbc.queryForObject("SELECT status FROM questions WHERE id = ?", String.class, question));
         assertEquals("NOT_STARTED", jdbc.queryForObject("SELECT status FROM chapters WHERE id = ?", String.class, chapter));
         assertEquals(0, json.readTree(get("/progress").body()).path("totalXp").asInt());
+        jdbc.update("DELETE FROM generated_courses WHERE id = ?", course);
+        var removed = assertThrows(org.springframework.web.server.ResponseStatusException.class,
+                () -> practiceService.completeGrading(inFlight,
+                        new AnswerGrade(100, "Clear.", "Add examples.", "Expected explanation.")));
+        assertEquals(404, removed.getStatusCode().value());
     }
 
     @Test
@@ -484,6 +555,19 @@ class AuthControllerTest {
                 Map.of("attemptId", passing.path("id").asText()), csrf());
         assertEquals(200, explained.statusCode(), explained.body());
         assertEquals("Sample grade.", json.readTree(explained.body()).path("explanation").asText());
+    }
+
+    @Test
+    void shortAnswerReviewUpdatesStatusWithoutLessonXp() throws Exception {
+        int userId = registerAndSignIn();
+        int course = insertCourse(userId, "Short-answer review");
+        int chapter = insertChapter(course, "Review chapter");
+        int question = addQuestion(chapter, "A review question?", "SHORT_ANSWER");
+        jdbc.update("UPDATE questions SET status = 'INCORRECT' WHERE id = ?", question);
+        JsonNode result = awaitAttempt(answer(question, "REVIEW", "mostly correct", UUID.randomUUID().toString(), 202));
+        assertEquals(70, result.path("score").asInt());
+        assertEquals(0, result.path("xpAwarded").asInt());
+        assertTrue(json.readTree(get("/chapters/" + chapter + "/review").body()).isEmpty());
     }
 
     private int addQuestion(int chapter, String title, String type) {
@@ -702,8 +786,24 @@ class AuthControllerTest {
     void profileChangesInvalidateOtherSessionsAndDeletionRemovesOwnedData() throws Exception {
         int userId = registerAndSignIn();
         int course = insertCourse(userId, "Owned course");
-        insertChapter(course, "Owned chapter");
+        int chapter = insertChapter(course, "Owned chapter");
+        int question = addQuestion(chapter, "Owned question?", "MULTIPLE_CHOICE");
+        practiceRepository.addAttempt(userId, question, UUID.randomUUID().toString(), "LESSON", "Other", "FAILED");
+        jdbc.update("INSERT INTO user_goals (user_id, goal_name, goal_type, target_value, start_value)"
+                + " VALUES (?, 'Owned goal', 'XP', 100, 0)", userId);
+        jdbc.update("INSERT INTO onboarding_cv (user_id, extracted_text) VALUES (?, 'Synthetic resume')", userId);
+        jdbc.update("""
+                INSERT INTO course_generation_jobs
+                    (user_id, request_id, status, interview_type, language, timeline, context)
+                VALUES (?, ?, 'FAILED', 'JOB', 'ENGLISH', 'LATER', 'Synthetic interview')
+                """, userId, UUID.randomUUID().toString());
+        jdbc.update("INSERT INTO quest_claims (user_id, request_id, quest_type, xp_awarded) VALUES (?, ?, 'daily', 900)",
+                userId, UUID.randomUUID().toString());
         jdbc.update("INSERT INTO progress (user_id, course_id, xp) VALUES (?, ?, 10)", userId, course);
+        String reservedName = username + "-reserved";
+        assertEquals(201, post("/auth/register", Map.of("username", reservedName, "password", PASSWORD), csrf()).statusCode());
+        assertEquals(409, write("PATCH", "/me", Map.of("username", reservedName), csrf()).statusCode());
+        assertEquals(400, write("PATCH", "/me", Map.of("username", "invalid@name"), csrf()).statusCode());
 
         String name = username + "-renamed";
         HttpResponse<String> updated = write("PATCH", "/me", Map.of("username", name), csrf());
@@ -732,6 +832,11 @@ class AuthControllerTest {
         assertEquals(401, get("/me").statusCode());
         assertEquals(0, jdbc.queryForObject("SELECT COUNT(*) FROM generated_courses WHERE id = ?", Integer.class, course));
         assertEquals(0, jdbc.queryForObject("SELECT COUNT(*) FROM progress WHERE user_id = ?", Integer.class, userId));
+        for (String table : List.of("practice_attempts", "quest_claims", "user_goals", "onboarding_cv",
+                "course_generation_jobs", "user_roles")) {
+            assertEquals(0, jdbc.queryForObject("SELECT COUNT(*) FROM " + table + " WHERE user_id = ?",
+                    Integer.class, userId), table);
+        }
     }
 
     @Test
@@ -746,6 +851,7 @@ class AuthControllerTest {
         int courseId = insertCourse(candidateId, "Managed course");
         int chapterId = insertChapter(courseId, "Managed chapter");
         jdbc.update("UPDATE chapters SET status = 'COMPLETED' WHERE id = ?", chapterId);
+        jdbc.update("UPDATE generated_courses SET status = 'COMPLETED' WHERE id = ?", courseId);
         jdbc.update("INSERT INTO progress (user_id, course_id, xp) VALUES (?, ?, 50)", candidateId, courseId);
 
         HttpResponse<String> filtered = get("/admin/users?search=" + candidateName + "&status=ACTIVE");
@@ -757,6 +863,7 @@ class AuthControllerTest {
         assertEquals("COMPLETED", jdbc.queryForObject("SELECT status FROM chapters WHERE id = ?", String.class, chapterId));
         assertEquals(204, post(user + "/progress-reset", Map.of(), csrf()).statusCode());
         assertEquals("NOT_STARTED", jdbc.queryForObject("SELECT status FROM chapters WHERE id = ?", String.class, chapterId));
+        assertEquals("ACTIVE", jdbc.queryForObject("SELECT status FROM generated_courses WHERE id = ?", String.class, courseId));
         assertEquals(204, write("PATCH", user, Map.of("active", "false"), csrf()).statusCode());
         assertEquals(1, json.readTree(get("/admin/users?search=" + candidateName + "&status=SUSPENDED")
                 .body()).path("total").asInt());
@@ -767,6 +874,16 @@ class AuthControllerTest {
         assertEquals(jdbc.queryForObject("SELECT COUNT(*) FROM questions WHERE status IN (\'COMPLETED\', \'INCORRECT\')",
                 Integer.class), overview.path("answeredQuestions").asInt());
         assertTrue(overview.path("averageXp").asDouble() >= 0);
+        for (int number = 0; number < 21; number++) {
+            jdbc.update("INSERT INTO users (username) VALUES (?)", candidateName + "-page-" + number);
+            insertCourse(candidateId, "Page course " + candidateName + " " + number);
+        }
+        JsonNode userPage = json.readTree(get("/admin/users?search=" + candidateName + "&page=1").body());
+        assertEquals(22, userPage.path("total").asInt());
+        assertEquals(2, userPage.path("items").size());
+        JsonNode coursePage = json.readTree(get("/admin/courses?search=Page%20course%20" + candidateName + "&page=1").body());
+        assertEquals(21, coursePage.path("total").asInt());
+        assertEquals(1, coursePage.path("items").size());
 
         String course = "/admin/courses/" + courseId;
         assertEquals(204, write("PATCH", course, Map.of("status", "ARCHIVED"), csrf()).statusCode());

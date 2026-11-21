@@ -4,6 +4,8 @@ import com.interviewai.desktop.api.AccountSummary;
 import com.interviewai.desktop.navigation.ScreenController;
 import com.interviewai.desktop.api.ApiException;
 import com.interviewai.desktop.api.AuthApi;
+import com.interviewai.desktop.api.CourseJobApi;
+import com.interviewai.desktop.api.dto.CourseJobStatus;
 import com.interviewai.desktop.navigation.DesktopNavigator;
 import javafx.concurrent.Task;
 import javafx.fxml.FXML;
@@ -17,6 +19,7 @@ import java.util.concurrent.Executor;
 public class LoginController extends ScreenController {
 
     private final AuthApi authApi;
+    private final CourseJobApi courseJobs;
     private final DesktopNavigator navigator;
     private final Executor executor;
     private final String initialMessage;
@@ -26,8 +29,9 @@ public class LoginController extends ScreenController {
     @FXML private PasswordField passwordField;
     @FXML private Label statusLabel;
 
-    public LoginController(AuthApi authApi, DesktopNavigator navigator, Executor executor, String initialMessage) {
+    public LoginController(AuthApi authApi, CourseJobApi courseJobs, DesktopNavigator navigator, Executor executor, String initialMessage) {
         this.authApi = authApi;
+        this.courseJobs = courseJobs;
         this.navigator = navigator;
         this.executor = executor;
         this.initialMessage = initialMessage;
@@ -50,13 +54,23 @@ public class LoginController extends ScreenController {
         form.setDisable(true);
         passwordField.clear();
         statusLabel.setText("Signing in…");
-        Task<AccountSummary> task = new Task<>() {
+        Task<LoginResult> task = new Task<>() {
             @Override
-            protected AccountSummary call() throws Exception {
-                return authApi.login(identifier, password);
+            protected LoginResult call() throws Exception {
+                AccountSummary account = authApi.login(identifier, password);
+                CourseJobStatus job = account.isAdministrator() ? null : courseJobs.latest();
+                return new LoginResult(account, job);
             }
         };
-        task.setOnSucceeded(event -> navigator.showAccount(task.getValue()));
+        task.setOnSucceeded(event -> {
+            LoginResult result = task.getValue();
+            CourseJobStatus job = result.job();
+            if (job != null && !"SUCCEEDED".equals(job.getStatus())) {
+                navigator.showCourseJob(result.account(), job);
+            } else {
+                navigator.showAccount(result.account());
+            }
+        });
         task.setOnFailed(event -> {
             form.setDisable(false);
             if (task.getException() instanceof ApiException error) {
@@ -66,6 +80,9 @@ public class LoginController extends ScreenController {
             }
         });
         submit(task, executor);
+    }
+
+    private record LoginResult(AccountSummary account, CourseJobStatus job) {
     }
 
     @FXML

@@ -24,6 +24,7 @@ import javafx.scene.control.DialogPane;
 import javafx.scene.control.Label;
 import javafx.scene.control.ListView;
 import javafx.scene.control.RadioButton;
+import javafx.scene.control.ScrollPane;
 import javafx.scene.control.TabPane;
 import javafx.scene.control.TextInputControl;
 import javafx.stage.Stage;
@@ -123,17 +124,29 @@ class DesktopViewsTest {
     @Test
     void candidateAndAdministratorCanOpenTheirScreens() throws Exception {
         HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        AtomicBoolean resumeGeneration = new AtomicBoolean();
+        AtomicBoolean missingLesson = new AtomicBoolean();
         server.createContext("/api/v1", exchange -> {
             try (exchange) {
                 String request = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
-                String response = responseBody(exchange.getRequestURI().getPath(), request);
+                String path = exchange.getRequestURI().getPath();
+                if (path.endsWith("/auth/login") && request.contains("resume")) {
+                    resumeGeneration.set(true);
+                }
+                String response = resumeGeneration.get() && path.equals("/api/v1/course-jobs/latest")
+                        ? "{\"id\":9,\"status\":\"RUNNING\",\"message\":\"Generating resumed course…\",\"progress\":30}"
+                        : responseBody(path, request);
                 if (response == null) {
                     exchange.sendResponseHeaders(204, -1);
                     return;
                 }
+                int status = missingLesson.get() && path.equals("/api/v1/chapters/2/questions") ? 404 : 200;
+                if (status == 404) {
+                    response = "{\"message\":\"The lesson is no longer available.\"}";
+                }
                 byte[] body = response.getBytes(StandardCharsets.UTF_8);
                 exchange.getResponseHeaders().set("Content-Type", "application/json");
-                exchange.sendResponseHeaders(200, body.length);
+                exchange.sendResponseHeaders(status, body.length);
                 exchange.getResponseBody().write(body);
             }
         });
@@ -156,6 +169,9 @@ class DesktopViewsTest {
                     return null;
                 });
 
+                press("Check backend connection");
+                waitForText("#statusLabel", "Connected to the backend.");
+                press("Back to sign-in");
                 press("Create account");
                 assertNotNull(onFx(() -> node("#emailField")));
                 press("Back to sign-in");
@@ -204,6 +220,16 @@ class DesktopViewsTest {
                 waitForText("#summaryLabel", "25 XP");
                 assertNotNull(onFx(() -> node("#xpChart")));
                 screenshot("progress");
+                onFx(() -> {
+                    ((ScrollPane) stage.getScene().getRoot()).setVvalue(1);
+                    return null;
+                });
+                waitFor(() -> node("#rankings").localToScene(node("#rankings").getBoundsInLocal()).getMinY()
+                        < stage.getScene().getHeight(), "the leaderboard after scrolling");
+                onFx(() -> {
+                    ((ScrollPane) stage.getScene().getRoot()).setVvalue(0);
+                    return null;
+                });
                 press("Back to dashboard");
                 waitForText("#xpLabel", "25 XP");
                 press("Profile");
@@ -219,6 +245,15 @@ class DesktopViewsTest {
                 waitForText("#overview", "3 users");
                 assertNotNull(onFx(() -> node("#tabs")));
                 screenshot("admin");
+                press("Sign out");
+                waitForText("#statusLabel", "You signed out.");
+                signIn("resume");
+                waitForText("#statusLabel", "Generating resumed course");
+                press("Back to dashboard");
+                waitForText("#xpLabel", "25 XP");
+                missingLesson.set(true);
+                press("Open lesson");
+                waitForText("#xpLabel", "25 XP");
             } finally {
                 onFx(() -> {
                     if (stage != null) {
@@ -233,16 +268,47 @@ class DesktopViewsTest {
     }
 
     @Test
-    @EnabledIfSystemProperty(named = "interviewai.journey", matches = "true")
-    void desktopJourneyAgainstPackagedBackend() throws Exception {
-        assertNotNull(System.getenv("INTERVIEWAI_API_URL"), "Set the disposable backend's origin.");
-        DesktopApplication app = onFx(() -> {
+    @EnabledIfSystemProperty(named = "interviewai.restart.journey", matches = "true")
+    void savedCandidateProgressSurvivesApplicationRestarts() throws Exception {
+        String candidate = System.getenv("INTERVIEWAI_RESTART_CANDIDATE");
+        assertNotNull(candidate);
+        DesktopApplication app = openApplication();
+        try {
+            signIn(candidate);
+            waitForText("#xpLabel", String.format("%,d XP", 1290));
+            waitForText("#chapterName", "Chapter 1");
+            press("Review this chapter");
+            waitForText("#questionLabel", "No more questions to review.");
+            press("Back to dashboard");
+            waitForText("#xpLabel", String.format("%,d XP", 1290));
+            press("Progress and quests");
+            waitForText("#summaryLabel", "1 chapters completed");
+            waitFor(() -> ((ListView<?>) node("#goals")).getItems().stream()
+                    .anyMatch(goal -> goal.toString().contains("Practice weekly")), "the saved goal");
+        } finally {
+            onFx(() -> {
+                stage.close();
+                app.stop();
+                return null;
+            });
+        }
+    }
+
+    private DesktopApplication openApplication() throws Exception {
+        return onFx(() -> {
             DesktopApplication application = new DesktopApplication();
             stage = new Stage();
             stage.setOpacity(0);
             application.start(stage);
             return application;
         });
+    }
+
+    @Test
+    @EnabledIfSystemProperty(named = "interviewai.journey", matches = "true")
+    void desktopJourneyAgainstPackagedBackend() throws Exception {
+        assertNotNull(System.getenv("INTERVIEWAI_API_URL"), "Set the disposable backend's origin.");
+        DesktopApplication app = openApplication();
         try {
             String username = "desktop-" + UUID.randomUUID().toString().substring(0, 12);
             press("Create account");
@@ -474,6 +540,7 @@ class DesktopViewsTest {
 
     private static String responseBody(String path, String request) throws IOException {
         return switch (path) {
+            case "/api/v1/health" -> "{\"status\":\"UP\"}";
             case "/api/v1/auth/csrf" -> "{\"headerName\":\"X-CSRF-TOKEN\",\"token\":\"test\"}";
             case "/api/v1/auth/login" -> request.contains("administrator")
                     ? """
@@ -495,6 +562,9 @@ class DesktopViewsTest {
                       "status":"NOT_STARTED","choices":["One","Two"],
                       "savedAttempt":{"id":7,"status":"FAILED","mode":"LESSON","answer":"Two",
                         "explanation":"Provider was unavailable.","xpAwarded":0}}]
+                    """;
+            case "/api/v1/course-jobs/9" -> """
+                    {"id":9,"status":"RUNNING","message":"Generating resumed course…","progress":30}
                     """;
             case "/api/v1/questions/1/attempts" -> """
                     {"id":1,"status":"GRADED","score":0,"explanation":"Expected answer: One","xpAwarded":0}

@@ -113,6 +113,7 @@ public class AdminRepository {
                 WHERE chapter_id IN (SELECT c.id FROM chapters c JOIN generated_courses g ON c.course_id = g.id
                     WHERE g.user_id = ?)
                 """, id);
+        jdbc.update("UPDATE generated_courses SET status = 'ACTIVE' WHERE user_id = ? AND UPPER(status) = 'COMPLETED'", id);
         jdbc.update("DELETE FROM practice_attempts WHERE user_id = ?", id);
         jdbc.update("UPDATE user_goals SET start_value = 0, current_value = 0 WHERE user_id = ?", id);
     }

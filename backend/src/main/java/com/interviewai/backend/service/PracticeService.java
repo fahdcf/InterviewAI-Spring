@@ -149,6 +149,7 @@ public class PracticeService {
         }
         practice.updateQuestion(question, grade.passed());
         practice.updateChapter(question.chapterId());
+        practice.updateCourse(question.courseId());
         practice.complete(attempt.id(), grade, xp);
     }
 

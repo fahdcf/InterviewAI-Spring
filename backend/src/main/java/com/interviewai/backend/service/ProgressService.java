@@ -55,7 +55,10 @@ public class ProgressService {
     public List<GoalResponse> goals(int userId) {
         List<GoalResponse> result = new ArrayList<>();
         for (GoalResponse goal : progress.goals(userId)) {
-            long current = Math.max(0, metric(userId, goal.type()) - goal.startValue());
+            long current = metric(userId, goal.type());
+            if (!"STREAK".equals(goal.type())) {
+                current = Math.max(0, current - goal.startValue());
+            }
             result.add(new GoalResponse(goal.id(), goal.name(), goal.type(), goal.target(), goal.startValue(), current));
         }
         return result;

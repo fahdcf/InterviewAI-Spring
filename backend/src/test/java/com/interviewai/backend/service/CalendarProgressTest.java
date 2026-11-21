@@ -19,6 +19,8 @@ import org.springframework.test.context.ActiveProfiles;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.OffsetDateTime;
+import java.time.Duration;
 import java.time.ZoneId;
 import java.util.List;
 import java.util.Map;
@@ -58,16 +60,19 @@ class CalendarProgressTest {
             for (String type : List.of("QUESTIONS", "XP", "CHAPTERS", "TIME", "COURSES", "STREAK")) {
                 progress.addGoal(userId, new GoalRequest(type, type, 100));
             }
+            jdbc.update("UPDATE user_goals SET start_value = 99 WHERE user_id = ? AND goal_type = \'STREAK\'", userId);
             Map<String, GoalResponse> before = goals(userId);
             assertEquals(40, before.get("XP").startValue());
             assertEquals(17, before.get("TIME").startValue());
-            assertEquals(0, before.get("STREAK").startValue());
+            assertEquals(99, before.get("STREAK").startValue());
             assertEquals(1, before.get("STREAK").currentValue());
 
             jdbc.update("""
                     INSERT INTO progress (user_id, course_id, xp, last_updated)
-                    VALUES (?, ?, 100, '2026-11-20 23:30:00')
-                    """, userId, course);
+                    VALUES (?, ?, 100, ?)
+                    """, userId, course, java.time.LocalDateTime.ofInstant(
+                    LocalDate.of(2026, 11, 21).atStartOfDay(clock.getZone()).plusMinutes(30).toInstant(),
+                    java.time.ZoneOffset.UTC));
             questions(chapter, 1, "2026-11-21 12:00:00");
             chapter(course, 2, "2026-11-21 12:00:00");
             course(userId, "Second");
@@ -127,6 +132,24 @@ class CalendarProgressTest {
             assertTrue(monthly(userId).available());
             quests.claim(userId, "monthly", UUID.randomUUID().toString());
             assertEquals(61800, progress.summary(userId).totalXp());
+        } finally {
+            profiles.deleteAccount(userId, "synthetic-calendar-password");
+        }
+    }
+
+    @Test
+    void dailyResetFollowsCasablancaOffsetChanges() {
+        ZoneId zone = clock.getZone();
+        var transition = zone.getRules().nextTransition(Instant.parse("2026-01-01T00:00:00Z"));
+        LocalDate transitionDay = transition.getDateTimeBefore().toLocalDate();
+        Instant start = transitionDay.atStartOfDay(zone).toInstant();
+        Instant nextDay = transitionDay.plusDays(1).atStartOfDay(zone).toInstant();
+        clock.set(start.plusSeconds(1800).toString());
+        int userId = register();
+        try {
+            Instant reset = OffsetDateTime.parse(daily(userId).resetsAt()).toInstant();
+            assertEquals(nextDay, reset);
+            assertTrue(Duration.between(start, reset).toHours() != 24);
         } finally {
             profiles.deleteAccount(userId, "synthetic-calendar-password");
         }

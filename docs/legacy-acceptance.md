@@ -45,3 +45,12 @@ The screenshots below use synthetic data. The original and migrated captures hav
 The migrated layouts organize controls by feature and use the original dark and green palette. Profile statistics and the admin answered-question and average-XP metrics are included. The original dashboard displays a hard-coded longest streak and level text. The original admin service labels memory and provider-health values as placeholders. The migrated views show the persisted learning statistics.
 
 The reference run verified data queries, sign-in and screen loading. The full action-by-action manual exercise of every original control remains unverified. Migrated candidate and administrator actions are exercised by `DesktopViewsTest` with a packaged backend, MySQL and provider fixtures. Real provider calls are skipped at the user's request.
+## Recorded rule choices and corrections
+
+- The dedicated quests screen uses 20 answered questions for 900 XP and 12 completed chapters in a month for 30,000 XP. The legacy `ProgressDAO.getDailyQuests` also defines dashboard descriptions for earning 50 XP, answering five questions and extending a streak, with nominal rewards of 50, 30 and 20 XP. The migrated claim API follows the dedicated quests screen. The original dashboard handler for opening quests only logs a message.
+- The estimate adds two minutes per answered question and fifteen minutes per positive XP event. The migrated UI labels it as estimated time.
+- Streak goals remain absolute even when imported data contains a nonzero starting value. The other goal types subtract their stored baseline.
+- Completing the last chapter marks the course complete in the same transaction. An administrator's progress reset reopens a completed course. Archived courses retain their archive state.
+- XP reset sets historical XP amounts to zero while retaining their event dates. Full progress reset also clears question/chapter completion, saved attempts and goal baselines. Existing quest claims and calendar markers remain, so replaying an earlier request cannot grant its reward again.
+- V8 preserves subsecond ordering between answers and a daily quest reset. The original second-precision columns could miss newly earned answers in that same second.
+- Optional CVs, invalid uploads, provider failures and partial course saves have explicit recovery behavior. Uploaded files are extracted during their owning request and discarded, with only bounded text stored for that user.

@@ -284,6 +284,10 @@ public class PracticeController extends ScreenController {
                 navigator.showLogin("Sign in again to continue.");
                 return;
             }
+            if (task.getException() instanceof ApiException error && error.getStatus() == 404) {
+                navigator.showDashboard(account);
+                return;
+            }
             status.setText(task.getException() instanceof ApiException error
                     ? error.getMessage() : "Could not reach the backend. Try again.");
             updateButtons(false);

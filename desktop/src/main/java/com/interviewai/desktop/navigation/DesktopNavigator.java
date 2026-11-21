@@ -65,7 +65,7 @@ public class DesktopNavigator {
     }
 
     public void showLogin(String message) {
-        show("login-view.fxml", new LoginController(authApi, this, executor, message));
+        show("login-view.fxml", new LoginController(authApi, courseJobs, this, executor, message));
     }
 
     public void showRegistration() {

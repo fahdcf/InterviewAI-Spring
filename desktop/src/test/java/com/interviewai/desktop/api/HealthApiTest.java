@@ -9,9 +9,13 @@ import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.URI;
 import java.net.http.HttpClient;
+import java.net.http.HttpTimeoutException;
+import java.time.Duration;
+import java.util.Map;
 import java.nio.charset.StandardCharsets;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -58,6 +62,40 @@ class HealthApiTest {
         }
         respondWith(503, "<html>Unavailable</html>");
         assertThrows(ApiException.class, healthApi::isBackendUp);
+    }
+
+    @Test
+    void boundsSlowRequestsAndReportsDisconnectedServers() throws Exception {
+        server.createContext("/api/v1/auth/csrf", exchange -> {
+            try (exchange) {
+                byte[] response = "{\"headerName\":\"X-CSRF-TOKEN\",\"token\":\"fixture-token\"}"
+                        .getBytes(StandardCharsets.UTF_8);
+                exchange.sendResponseHeaders(200, response.length);
+                exchange.getResponseBody().write(response);
+            }
+        });
+        server.createContext("/slow", exchange -> {
+            try (exchange) {
+                try {
+                    Thread.sleep(500);
+                } catch (InterruptedException interrupted) {
+                    Thread.currentThread().interrupt();
+                }
+            }
+        });
+        URI origin = URI.create("http://127.0.0.1:" + server.getAddress().getPort());
+        ApiClient api = new ApiClient(origin, httpClient);
+        assertThrows(HttpTimeoutException.class,
+                () -> api.writeJson("POST", "/slow", Map.of(), Void.class, Duration.ofMillis(100)));
+        server.stop(0);
+        assertThrows(IOException.class, () -> api.getJson("/api/v1/health"));
+    }
+
+    @Test
+    void acceptsAnEmptySuccessfulResponse() throws Exception {
+        respondWith(204, "");
+        ApiClient api = new ApiClient(URI.create("http://127.0.0.1:" + server.getAddress().getPort()), httpClient);
+        assertNull(api.readJson("/api/v1/health", ProgressApi.Summary.class));
     }
 
     @Test

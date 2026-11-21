@@ -189,6 +189,16 @@ public class PracticeRepository {
         }
     }
 
+    public void updateCourse(int courseId) {
+        jdbc.update("""
+                UPDATE generated_courses SET status = 'COMPLETED'
+                WHERE id = ? AND (status IS NULL OR UPPER(status) <> 'ARCHIVED')
+                    AND EXISTS (SELECT 1 FROM chapters c WHERE c.course_id = generated_courses.id)
+                    AND NOT EXISTS (SELECT 1 FROM chapters c WHERE c.course_id = generated_courses.id
+                        AND (c.status IS NULL OR c.status <> 'COMPLETED'))
+                """, courseId);
+    }
+
     public void awardXp(int userId, int courseId, int xp) {
         jdbc.update("INSERT INTO progress (user_id, course_id, xp) VALUES (?, ?, ?)", userId, courseId, xp);
     }
