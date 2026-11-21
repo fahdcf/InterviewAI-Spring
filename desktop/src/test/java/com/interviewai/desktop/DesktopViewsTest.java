@@ -533,7 +533,12 @@ class DesktopViewsTest {
     }
 
     private void waitForButton(String label) throws Exception {
-        waitFor(() -> !button(label).isDisabled(), label);
+        waitFor(() -> {
+            stage.getScene().getRoot().applyCss();
+            return stage.getScene().getRoot().lookupAll(".button").stream()
+                    .anyMatch(node -> node instanceof Button button && label.equals(button.getText())
+                            && !button.isDisabled());
+        }, label);
     }
 
     private void waitForText(String selector, String text) throws Exception {
