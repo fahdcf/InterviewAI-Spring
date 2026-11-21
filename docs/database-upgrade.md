@@ -33,3 +33,4 @@ V7 adds a session version to each account so password changes, suspension and ro
 
 For HTTPS deployment, set `SESSION_COOKIE_SECURE=true` on the backend.
 V8 increases question-update and daily-reset timestamps to microsecond precision. This preserves existing timestamps and lets a newly earned daily cycle include answers submitted in the same second as the previous claim. The MySQL calendar tests verify consecutive cycles, monthly rollover and rollback after a failed claim write.
+The Docker deployment rehearsal also upgraded a V7 database to V8, reopened the candidate from JavaFX, exported the upgraded database, and restored it into a separate MySQL service. The restored copy matched two accounts, two courses, 960 questions, 1,290 XP and eight Flyway rows. The source database for a real installation must still be supplied for its actual cutover.

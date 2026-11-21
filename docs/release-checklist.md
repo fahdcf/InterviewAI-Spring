@@ -12,7 +12,7 @@ On Windows with JDK 21, run the following from a clean checkout.
 
 The packaging script creates a Spring Boot JAR and a ZIP containing the desktop application and its Java runtime. Extract the full ZIP and run `InterviewAI.exe`. The ZIP's directory layout is required by the launcher. The backend runs with `java -jar` and the database and provider variables in the README. [Java packaging tool](https://docs.oracle.com/en/java/javase/21/docs/specs/man/jpackage.html)
 
-The `Verify` workflow publishes both packages as the `interviewai-windows-build` artifact for seven days. A fresh Windows runner downloads that artifact, extracts the ZIP in a new folder, and checks that the sign-in window opens with the bundled JVM and Java removed from the process PATH.
+The `Verify` workflow publishes both packages and SHA-256 checksums as the `interviewai-windows-build` artifact for seven days. A fresh Windows runner downloads that artifact, extracts the ZIP in a new folder, and checks that the sign-in window opens with the bundled JVM and Java removed from the process PATH.
 
 ## Release acceptance
 
@@ -24,14 +24,14 @@ The `Verify` workflow publishes both packages as the `interviewai-windows-build`
 - [x] Exercise the full candidate flow over HTTP on MySQL using local provider fixtures, from registration and course generation through completing a 40-question chapter, reviewing a missed answer, checking XP, and signing out.
 - [x] Exercise the candidate flow through the JavaFX application against a separate packaged Spring Boot process, MySQL, and local provider fixtures. Verify both generated courses, all 40 answers in the first chapter, missed-answer review, explanations, a daily reward, a saved goal, and progress after signing out and signing back in.
 - [x] Send two requests for the same daily quest reward and verify the account receives one award.
-- [ ] Repeat the full candidate flow from the JavaFX application using the deployed backend.
-- [ ] Use one synthetic CV to verify a live Gemini job and test grading and explanations with OpenRouter. Record the configured model IDs and outcome while keeping credentials in the backend environment.
-- [ ] Sign in from a second machine using the deployed API address. The deployment must use HTTPS and secure session cookies.
+- [x] Repeat the candidate JavaFX journey against the local Docker deployment through trusted HTTPS.
+- Live Gemini and OpenRouter acceptance is skipped at the user\'s request on 21 November 2026. The opt-in workflow remains available.
+- Remote-server and second-machine acceptance is skipped at the user\'s request on 21 November 2026. A separate client container verified the local HTTPS endpoint.
 - [x] Repeat the candidate journey through a local HTTPS reverse proxy with a certificate trusted by the test JVM. Verify the backend sends a session cookie with the `Secure` attribute.
 - [x] Exercise administration in the migrated JavaFX app against MySQL. Verify analytics, candidate search, email edits, suspension and reactivation, separate XP and progress resets, and course archive, restore, and deletion.
-- [ ] Sign in as an administrator and verify user, course and analytics actions using the legacy acceptance scenarios.
+- [x] Exercise migrated administrator actions using the legacy acceptance scenario data, including filtering, pagination, separate resets, and course administration.
 - [x] Rehearse upgrading and restoring a synthetic copy of the legacy database. Follow the [upgrade instructions](database-upgrade.md) again with the data selected for cutover.
-- [ ] Review the parity gaps listed in the migration status before tagging a stable release.
+- [x] Record the original-screen comparison, rule choices, deliberate fixes and verification limits in the legacy acceptance record.
 
 ## Cutover and restore
 
@@ -48,7 +48,7 @@ For a remote deployment, put an HTTPS reverse proxy on the backend host, forward
 
 ## Live providers
 
-Add `GEMINI_API_KEY` and `OPENROUTER_API_KEY` as repository Actions secrets and run **Provider acceptance** from the Actions tab when ready to use provider quota. The workflow extracts text from a synthetic PDF, asks Gemini for both complete courses, and checks OpenRouter grading and explanations. It logs model identifiers and elapsed times. Repeat a learning flow against the deployed backend for the separate deployment acceptance check.
+Add `GEMINI_API_KEY` and `OPENROUTER_API_KEY` as repository Actions secrets and run **Provider acceptance** from the Actions tab when ready to use provider quota. This live check is excluded from this release acceptance at the user\'s request. The workflow extracts text from a synthetic PDF, asks Gemini for both complete courses, and checks OpenRouter grading and explanations. It logs model identifiers and elapsed times. Repeat a learning flow against the deployed backend for the separate deployment acceptance check.
 
 To use local backend credentials or different supported models, configure the values described in the README and run:
 

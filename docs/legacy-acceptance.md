@@ -1,6 +1,6 @@
 # Legacy acceptance checklist
 
-The `legacy-baseline` tag contains the Git tree from [InterviewAI at b5aebcf](https://github.com/fahdcf/InterviewAI/tree/b5aebcf4d1263978a36a58d8b9f48ae00364ea02). The snapshot compiles and packages with JDK 21. Maven reports zero legacy tests. The prior offline review loaded the login, registration and onboarding FXML. The live legacy checks below are pending a disposable MySQL instance and provider configuration.
+The `legacy-baseline` tag contains the Git tree from [InterviewAI at b5aebcf](https://github.com/fahdcf/InterviewAI/tree/b5aebcf4d1263978a36a58d8b9f48ae00364ea02). The snapshot compiles and packages with JDK 21. Maven reports zero legacy tests. The reference run below uses a disposable MySQL instance, synthetic accounts and saved course data. Live provider calls are excluded at the user's request.
 
 Use synthetic accounts, courses and CVs. Record the actual result and any existing defects, then repeat each check against the migrated app after the corresponding stage in the [migration plan](../MIGRATION_PLAN.md).
 
@@ -44,7 +44,7 @@ The screenshots below use synthetic data. The original and migrated captures hav
 
 The migrated layouts organize controls by feature and use the original dark and green palette. Profile statistics and the admin answered-question and average-XP metrics are included. The original dashboard displays a hard-coded longest streak and level text. The original admin service labels memory and provider-health values as placeholders. The migrated views show the persisted learning statistics.
 
-The reference run verified data queries, sign-in and screen loading. The full action-by-action manual exercise of every original control remains unverified. Migrated candidate and administrator actions are exercised by `DesktopViewsTest` with a packaged backend, MySQL and provider fixtures. Real provider calls are skipped at the user's request.
+The reference run verified data queries, sign-in and screen loading. The comparison uses the source inventory and representative runtime captures. A full manual exercise of every original control was not performed. Migrated candidate and administrator actions are exercised by `DesktopViewsTest` with a packaged backend, MySQL and provider fixtures. Real provider calls are skipped at the user's request.
 ## Recorded rule choices and corrections
 
 - The dedicated quests screen uses 20 answered questions for 900 XP and 12 completed chapters in a month for 30,000 XP. The legacy `ProgressDAO.getDailyQuests` also defines dashboard descriptions for earning 50 XP, answering five questions and extending a streak, with nominal rewards of 50, 30 and 20 XP. The migrated claim API follows the dedicated quests screen. The original dashboard handler for opening quests only logs a message.

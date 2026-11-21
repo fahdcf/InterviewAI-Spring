@@ -8,6 +8,12 @@ InterviewAI is a desktop interview preparation app. This repository contains the
 | :---: | :---: |
 | <a href="https://github.com/fahdcf"><img src="https://avatars.githubusercontent.com/u/132993312?v=4&amp;s=160" width="80" height="80" alt="Fahd Chafai on GitHub"></a> | <a href="https://github.com/hassan-elkhatoury"><img src="https://avatars.githubusercontent.com/u/128185741?v=4&amp;s=160" width="80" height="80" alt="Hassan El Khatoury on GitHub"></a> |
 
+## Migration release
+
+Version `1.0.0` provides the migrated desktop and backend. Download the Windows ZIP, Spring Boot JAR and checksums from [GitHub Releases](https://github.com/fahdcf/InterviewAI-Spring/releases/tag/v1.0.0). Extract the full desktop ZIP and run `InterviewAI.exe`. Start the backend with `java -jar interviewai-backend-1.0.0.jar` after configuring the database. [Release verification](docs/migration-status.md)
+
+Live-provider and remote-server acceptance were skipped at the user's request. Local MySQL, simulated providers, JavaFX journeys, HTTPS deployment, restart recovery and Windows packaging are verified. The original app's layouts have been reorganized in the migrated frontend. [Reference comparison](docs/legacy-acceptance.md)
+
 ## Features
 
 The JavaFX client supports registration, sign-in, sign-out, course browsing, chapter selection, XP and streaks. **Interview preferences** saves interview details and an optional PDF, DOCX, or DOC CV. **Generate courses** starts a background job that produces one technical and one soft-skills course. **Generation status** reopens progress after leaving the waiting screen. The backend saves both courses together after validating every chapter and question.

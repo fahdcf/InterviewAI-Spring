@@ -57,7 +57,7 @@ jobs:
           java -cp "backend/target/test-classes:$(cat backend/target/fixture-classpath.txt)" \
             com.interviewai.backend.fixture.ProviderFixtures 18586 > provider-fixtures.log 2>&1 &
           fixture_pid=$!
-          java -jar backend/target/interviewai-backend-0.1.0-SNAPSHOT.jar > backend-journey.log 2>&1 &
+          java -jar backend/target/interviewai-backend-1.0.0.jar > backend-journey.log 2>&1 &
           backend_pid=$!
           trap 'kill "$backend_pid" "$fixture_pid" 2>/dev/null || true' EXIT
           for attempt in {1..30}; do
@@ -96,6 +96,7 @@ jobs:
           path: |
             target/distribution-*/InterviewAI-windows.zip
             target/distribution-*/interviewai-backend-*.jar
+            target/distribution-*/SHA256SUMS
           if-no-files-found: error
           retention-days: 7
 

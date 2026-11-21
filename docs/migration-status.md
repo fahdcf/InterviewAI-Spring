@@ -1,19 +1,23 @@
 # Migration status
 
-The migrated desktop and backend are runnable from this repository. The stable release is pending the live-provider and deployment checks below.
+The JavaFX desktop and Spring Boot backend are implemented and packaged for version `1.0.0`. Live-provider and remote-server acceptance are skipped at the user's request on 21 November 2026.
 
-| Plan stages | Delivered | Verification |
+| Plan group | Result | Verification |
 | --- | --- | --- |
-| A–H | Source snapshot, separate Maven modules, MySQL migrations, HTTP client, registration and sign-in | Original source builds with JDK 21. Backend session and SQL tests pass on MySQL. The legacy live UI baseline still needs a complete manual run. |
-| I | Course dashboard, chapter browsing, saved navigation, ownership checks | MySQL tests cover saving a chapter, signing out and back in, inaccessible IDs, and archived courses. |
-| J–M | Onboarding, optional CV, configurable Gemini integration and persistent course generation | MySQL tests cover multipart upload, preference persistence, both complete courses, invalid provider data, repeat requests and retry. Tests use a local Gemini fixture. |
-| N–O | Multiple-choice and short-answer practice, saved attempts, incorrect-question review and on-demand explanations | MySQL tests cover the passing threshold, review, once-only XP, explanation eligibility and provider failure. Tests use a local OpenRouter fixture. |
-| P–Q | XP chart, editable goals, leaderboard, daily and monthly quest claims with a countdown | MySQL tests cover historical XP, goal baselines after edits and simultaneous or replayed claims. |
-| R–T | Profile, session invalidation, account deletion and admin views | MySQL tests cover password changes, session isolation, permission checks and account deletion. The JavaFX admin journey verifies user and course actions on the candidate created by the test. |
-| U–V | Independent desktop and backend builds, JavaFX smoke tests and a candidate journey | The JavaFX app connects to the packaged backend with MySQL and provider fixtures, completes a generated chapter, reviews an answer, claims XP, edits a goal, and signs in again. The manual comparison with the original app remains open. |
-| W | The desktop and packaged backend run in separate processes | The JavaFX candidate journey passed through a local HTTPS proxy with secure session cookies. Live provider checks and a second-machine deployment test are pending. |
-| X | Windows application image with bundled runtime and runnable Spring Boot JAR | A clean checkout built both. A fresh Windows runner downloaded the artifact and opened the sign-in window using the bundled JVM with external Java off PATH. |
-| Y | Upgrade and restore rehearsal | A synthetic legacy database migrated through V7. Sign-in, navigation and XP worked after upgrade. A dump restored into a second MySQL instance preserved IDs, quest marker, XP rows and dates, and the goal baseline. |
-| Z | Release checklist and reproducible packaging | The stable release tag is pending remaining acceptance checks. |
+| A–B | Pinned source, separate repository, source inventory and original-screen comparison | Original auth and navigation queried on MySQL. Seventeen original views opened and representative screens were captured. [Reference run](legacy-acceptance.md) and [control inventory](ui-inventory.md). |
+| C–E | Independent builds, structured frontend, screen disposal and OpenAPI | Dependency rules reject cross-module implementation dependencies. JavaFX tests cover screen lifecycle and unknown JSON fields. OpenAPI tests compare controller routes and security. |
+| F–G | Versioned MySQL schema and transactional repositories | Flyway V1–V8, nested insert rollback, upgrade/restore rehearsal and repeated startup. [Upgrade record](database-upgrade.md). |
+| H–I | Sessions, roles, dashboard, course selection and saved navigation | HTTP tests cover legacy hashes, CSRF, invalidated sessions, simultaneous users, owned IDs and archived/deleted courses. Fresh candidates open onboarding. |
+| J–M | CV upload, course generation, durable jobs and reconnect | PDF, DOCX, Word tables, DOC, corrupt/empty/oversized files, bounded retries, both complete courses, second pair, invalid provider data and restart recovery. Login reopens unfinished generation. |
+| N–O | Lessons, short-answer grading, review and explanations | Passing threshold, repeat and concurrent answers, once-only XP, restored unfinished answers, provider outage, deleted lessons and stale grading after a reset. |
+| P–Q | XP, streaks, all goal types, quests and countdowns | Historical XP, absolute streak goals, all goal baselines, Casablanca calendar transitions, next daily cycle within one second, monthly rollover and failed-claim rollback. |
+| R–T | Profiles, user/course administration and analytics | Identity and password updates, dependent-data deletion, filtering, pagination, suspension, separate XP/progress resets, course archive/restore/delete and summary statistics. |
+| U–V | Frontend cleanup and automated acceptance | JavaFX smoke tests load every migrated view. The candidate and admin journeys run against a packaged backend and MySQL in CI. [Test matrix](test-evidence.md). |
+| W | Local HTTP and HTTPS boundary verified | Live providers and remote-server acceptance are skipped at the user's request. Local tests use deterministic providers. |
+| X | Windows app with bundled runtime, Spring Boot JAR and HTTPS deployment | A fresh Windows runner downloads and launches the package with Java removed from PATH. The local Docker deployment passes the candidate journey. [Deployment](deployment.md). |
+| Y | Upgrade, backup and restore rehearsal | V8 upgrade preserves the candidate's progress. Separate MySQL restore matches users, courses, questions, XP and Flyway history. |
+| Z | Versioned build and release packaging | Release packages include the desktop ZIP, backend JAR and checksums. The release tag identifies their source revision. |
 
-The rebuilt screens use the original app's palette and core workflows. They have reorganized layouts and fewer decorative widgets. Simulation and other unfinished features remain outside the implemented migration. Use the [legacy checklist](legacy-acceptance.md) and [release checklist](release-checklist.md) to record the remaining comparisons and live checks.
+The frontend uses reorganized layouts with the original dark and green palette. The original simulation and feedback controllers are placeholders, and the original prompt FXML fails to load. Those unfinished workflows are recorded in the reference inventory. This release verifies the working interview preparation flows through the migrated JavaFX entry points.
+
+The original comparison combines source review, data queries and screen loading. A full manual exercise of every original control was not performed. The actual database and hosting environment for a production cutover have not been supplied. Local synthetic-data migration, restore and HTTPS deployment have been rehearsed.
