@@ -7,7 +7,6 @@ import org.springframework.stereotype.Component;
 
 import java.io.IOException;
 import java.net.URI;
-import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
@@ -20,13 +19,14 @@ public class GeminiCourseClient {
     private final ObjectMapper json;
     private final URI endpoint;
     private final String apiKey;
-    private final HttpClient http = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build();
+    private final ProviderHttpClient http;
 
     public GeminiCourseClient(ObjectMapper json, @Value("${interviewai.gemini.url}") URI endpoint,
-            @Value("${interviewai.gemini.key}") String apiKey) {
+            @Value("${interviewai.gemini.key}") String apiKey, ProviderHttpClient http) {
         this.json = json;
         this.endpoint = endpoint;
         this.apiKey = apiKey;
+        this.http = http;
     }
 
     public JsonNode generate(String prompt) throws InterruptedException {
@@ -41,13 +41,8 @@ public class GeminiCourseClient {
                     .header("Content-Type", "application/json")
                     .header("x-goog-api-key", apiKey)
                     .POST(HttpRequest.BodyPublishers.ofString(body)).build();
-            HttpResponse<String> response = http.send(request, HttpResponse.BodyHandlers.ofString());
+            HttpResponse<String> response = http.send(request);
             int status = response.statusCode();
-            if (status >= 500 || status == 429) {
-                Thread.sleep(1500);
-                response = http.send(request, HttpResponse.BodyHandlers.ofString());
-                status = response.statusCode();
-            }
             if (status == 429) {
                 throw new CourseGenerationException("The course provider is rate limited. Try again later.");
             }
@@ -61,6 +56,9 @@ public class GeminiCourseClient {
     }
 
     private JsonNode readContent(JsonNode response) throws IOException {
+        if (response == null) {
+            throw new CourseGenerationException("The course provider returned an empty answer.");
+        }
         JsonNode candidate = response.path("candidates").path(0);
         if (!"STOP".equals(candidate.path("finishReason").asText())) {
             throw new CourseGenerationException("The course provider did not finish generating its answer.");

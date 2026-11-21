@@ -3,6 +3,12 @@ package com.interviewai.backend.controller;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.interviewai.backend.fixture.ProviderFixtures;
+import com.interviewai.backend.model.CourseJob;
+import com.interviewai.backend.model.GeneratedChapter;
+import com.interviewai.backend.model.GeneratedCourse;
+import com.interviewai.backend.model.GeneratedQuestion;
+import com.interviewai.backend.service.SaveGeneratedCourses;
+import org.springframework.dao.DataIntegrityViolationException;
 import com.sun.net.httpserver.HttpServer;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
@@ -34,6 +40,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -65,6 +72,7 @@ class AuthControllerTest {
     @LocalServerPort private int port;
     @Autowired private ObjectMapper json;
     @Autowired private JdbcTemplate jdbc;
+    @Autowired private SaveGeneratedCourses courseSaver;
 
     private CookieManager cookies;
     private HttpClient client;
@@ -241,6 +249,26 @@ class AuthControllerTest {
                 .header(token.path("headerName").asText(), token.path("token").asText())
                 .POST(HttpRequest.BodyPublishers.ofByteArrays(parts)).build();
         return client.send(request, HttpResponse.BodyHandlers.ofString());
+    }
+
+    @Test
+    void failedNestedCourseInsertRollsBackBothCoursesAndNavigation() throws Exception {
+        int userId = registerAndSignIn();
+        GeneratedQuestion validQuestion = new GeneratedQuestion("A question?", "MULTIPLE_CHOICE",
+                "Expected", "Explanation", List.of("Expected", "Other"));
+        GeneratedQuestion invalidQuestion = new GeneratedQuestion("Another question?", "MULTIPLE_CHOICE",
+                "Expected", "Explanation", List.of("x".repeat(300)));
+        GeneratedCourse technical = new GeneratedCourse("Technical",
+                List.of(new GeneratedChapter(1, "Chapter", "Topics", List.of(validQuestion))));
+        GeneratedCourse softSkills = new GeneratedCourse("Soft skills",
+                List.of(new GeneratedChapter(1, "Chapter", "Topics", List.of(invalidQuestion))));
+        CourseJob job = new CourseJob(-1, userId, "RUNNING", 95, "Saving", null, null);
+        assertThrows(DataIntegrityViolationException.class, () -> courseSaver.save(job, technical, softSkills));
+        assertEquals(0, jdbc.queryForObject("SELECT COUNT(*) FROM generated_courses WHERE user_id = ?",
+                Integer.class, userId));
+        assertEquals(0, jdbc.queryForObject("SELECT COUNT(*) FROM interview_prep WHERE user_id = ?",
+                Integer.class, userId));
+        assertTrue(json.readTree(get("/courses").body()).isEmpty());
     }
 
     @Test

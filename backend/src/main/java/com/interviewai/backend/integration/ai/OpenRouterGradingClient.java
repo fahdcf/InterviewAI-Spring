@@ -9,7 +9,6 @@ import org.springframework.stereotype.Component;
 
 import java.io.IOException;
 import java.net.URI;
-import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
@@ -36,22 +35,23 @@ public class OpenRouterGradingClient {
     private final URI url;
     private final String key;
     private final String model;
-    private final HttpClient http = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(8)).build();
+    private final ProviderHttpClient http;
 
     public OpenRouterGradingClient(ObjectMapper json, @Value("${interviewai.openrouter.url}") URI url,
             @Value("${interviewai.openrouter.key}") String key,
-            @Value("${interviewai.openrouter.model}") String model) {
+            @Value("${interviewai.openrouter.model}") String model, ProviderHttpClient http) {
         this.json = json;
         this.url = url;
         this.key = key;
         this.model = model;
+        this.http = http;
     }
 
     public AnswerGrade grade(PracticeQuestion question, String answer) throws IOException, InterruptedException {
         String body = json.writeValueAsString(Map.of("model", model, "temperature", 0.3,
                 "max_tokens", 500, "response_format", Map.of("type", "json_object"),
                 "messages", messages(RUBRIC, question, answer)));
-        JsonNode grade = json.readTree(complete(body));
+        JsonNode grade = json.readTree(stripFence(complete(body)));
         if (grade == null || !grade.path("score").isIntegralNumber() || !grade.path("score").canConvertToInt()
                 || grade.path("score").asInt() < 0 || grade.path("score").asInt() > 100
                 || !grade.path("strengths").isTextual() || !grade.path("improvements").isTextual()
@@ -68,6 +68,14 @@ public class OpenRouterGradingClient {
         return complete(body).strip();
     }
 
+    private String stripFence(String content) {
+        String value = content.strip();
+        if (value.startsWith("```") && value.endsWith("```") && value.indexOf('\n') >= 0) {
+            return value.substring(value.indexOf('\n') + 1, value.length() - 3).strip();
+        }
+        return value;
+    }
+
     private List<Map<String, String>> messages(String prompt, PracticeQuestion question, String answer)
             throws IOException {
         String data = json.writeValueAsString(Map.of("question", question.text(),
@@ -82,7 +90,7 @@ public class OpenRouterGradingClient {
         HttpRequest request = HttpRequest.newBuilder(url).timeout(Duration.ofSeconds(30))
                 .header("Authorization", "Bearer " + key).header("Content-Type", "application/json")
                 .POST(HttpRequest.BodyPublishers.ofString(body)).build();
-        HttpResponse<String> response = http.send(request, HttpResponse.BodyHandlers.ofString());
+        HttpResponse<String> response = http.send(request);
         if (response.statusCode() != 200) {
             throw new IOException("OpenRouter returned HTTP " + response.statusCode() + ".");
         }
