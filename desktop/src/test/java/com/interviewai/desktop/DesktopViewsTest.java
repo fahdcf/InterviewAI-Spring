@@ -11,6 +11,8 @@ import com.interviewai.desktop.api.PracticeApi;
 import com.interviewai.desktop.api.ProfileApi;
 import com.interviewai.desktop.api.ProgressApi;
 import com.interviewai.desktop.navigation.DesktopNavigator;
+import com.interviewai.desktop.navigation.ScreenController;
+import javafx.concurrent.Task;
 import com.sun.net.httpserver.HttpServer;
 import javafx.application.Platform;
 import javafx.event.ActionEvent;
@@ -39,6 +41,8 @@ import java.net.http.HttpClient;
 import java.nio.charset.StandardCharsets;
 import java.util.UUID;
 import java.util.concurrent.Callable;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.FutureTask;
@@ -60,6 +64,56 @@ class DesktopViewsTest {
     @AfterAll
     static void stopJavaFx() {
         Platform.exit();
+    }
+
+    @Test
+    void disposedScreensIgnoreLateNetworkResults() throws Exception {
+        CountDownLatch started = new CountDownLatch(1);
+        CountDownLatch release = new CountDownLatch(1);
+        CountDownLatch finished = new CountDownLatch(1);
+        AtomicBoolean displayed = new AtomicBoolean();
+        class DelayedScreen extends ScreenController {
+            void load(ExecutorService executor) {
+                Task<String> task = new Task<>() {
+                    @Override
+                    protected String call() {
+                        started.countDown();
+                        boolean waiting = true;
+                        while (waiting) {
+                            try {
+                                release.await();
+                                waiting = false;
+                            } catch (InterruptedException ignored) {
+                                // Model a request whose remote operation has already started.
+                            }
+                        }
+                        finished.countDown();
+                        return "An old account's result";
+                    }
+                };
+                task.setOnSucceeded(event -> displayed.set(true));
+                submit(task, executor);
+            }
+        }
+        try (ExecutorService executor = Executors.newSingleThreadExecutor()) {
+            DelayedScreen screen = onFx(() -> {
+                DelayedScreen controller = new DelayedScreen();
+                controller.load(executor);
+                return controller;
+            });
+            try {
+                assertTrue(started.await(5, TimeUnit.SECONDS));
+                onFx(() -> {
+                    screen.dispose();
+                    return null;
+                });
+            } finally {
+                release.countDown();
+            }
+            assertTrue(finished.await(5, TimeUnit.SECONDS));
+            onFx(() -> null);
+            assertTrue(!displayed.get(), "Disposed screen displayed a late result.");
+        }
     }
 
     @Test

@@ -1,6 +1,7 @@
 package com.interviewai.desktop.feature.profile;
 
 import com.interviewai.desktop.api.AccountSummary;
+import com.interviewai.desktop.navigation.ScreenController;
 import com.interviewai.desktop.api.ApiException;
 import com.interviewai.desktop.api.ProfileApi;
 import com.interviewai.desktop.navigation.DesktopNavigator;
@@ -18,7 +19,7 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.Executor;
 import java.util.function.Consumer;
 
-public class ProfileController {
+public class ProfileController extends ScreenController {
 
     private AccountSummary account;
     private final ProfileApi api;
@@ -126,6 +127,6 @@ public class ProfileController {
             status.setText(task.getException() instanceof ApiException error
                     ? error.getMessage() : "The backend could not save this change. Try again.");
         });
-        executor.execute(task);
+        submit(task, executor);
     }
 }

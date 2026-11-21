@@ -1,6 +1,7 @@
 package com.interviewai.desktop.feature.dashboard;
 
 import com.interviewai.desktop.api.AccountSummary;
+import com.interviewai.desktop.navigation.ScreenController;
 import com.interviewai.desktop.api.ApiException;
 import com.interviewai.desktop.api.AuthApi;
 import com.interviewai.desktop.api.DashboardApi;
@@ -24,7 +25,7 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.Executor;
 import java.util.function.Consumer;
 
-public class DashboardController {
+public class DashboardController extends ScreenController {
 
     private final AccountSummary account;
     private final AuthApi auth;
@@ -239,6 +240,6 @@ public class DashboardController {
             statusLabel.setText(task.getException() instanceof ApiException error
                     ? error.getMessage() : "Could not reach the backend. Try again.");
         });
-        executor.execute(task);
+        submit(task, executor);
     }
 }

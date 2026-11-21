@@ -1,6 +1,7 @@
 package com.interviewai.desktop.feature.admin;
 
 import com.interviewai.desktop.api.AccountSummary;
+import com.interviewai.desktop.navigation.ScreenController;
 import com.interviewai.desktop.api.AdminApi;
 import com.interviewai.desktop.api.AdminApi.Course;
 import com.interviewai.desktop.api.AdminApi.User;
@@ -31,7 +32,7 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.Executor;
 import java.util.function.Consumer;
 
-public class AdminController {
+public class AdminController extends ScreenController {
 
     private final AccountSummary account;
     private final AdminApi api;
@@ -347,7 +348,7 @@ public class AdminController {
             status.setText(task.getException() instanceof ApiException error
                     ? error.getMessage() : "Could not load or save administrative data.");
         });
-        executor.execute(task);
+        submit(task, executor);
     }
 
     private record UsersAndRoles(AdminApi.UserPage users, List<String> roles) {

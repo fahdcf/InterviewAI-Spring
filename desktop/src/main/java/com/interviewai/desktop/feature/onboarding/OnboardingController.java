@@ -1,6 +1,7 @@
 package com.interviewai.desktop.feature.onboarding;
 
 import com.interviewai.desktop.api.AccountSummary;
+import com.interviewai.desktop.navigation.ScreenController;
 import com.interviewai.desktop.api.ApiException;
 import com.interviewai.desktop.api.CourseJobApi;
 import com.interviewai.desktop.api.OnboardingApi;
@@ -25,7 +26,7 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.Executor;
 import java.util.function.Consumer;
 
-public class OnboardingController {
+public class OnboardingController extends ScreenController {
 
     private final AccountSummary account;
     private final OnboardingApi api;
@@ -184,6 +185,6 @@ public class OnboardingController {
             statusLabel.setText(task.getException() instanceof ApiException error
                     ? error.getMessage() : "Could not complete the request. Check your connection and file.");
         });
-        executor.execute(task);
+        submit(task, executor);
     }
 }

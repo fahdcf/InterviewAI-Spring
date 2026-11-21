@@ -1,6 +1,7 @@
 package com.interviewai.desktop.feature.progress;
 
 import com.interviewai.desktop.api.AccountSummary;
+import com.interviewai.desktop.navigation.ScreenController;
 import com.interviewai.desktop.api.ApiException;
 import com.interviewai.desktop.api.ProgressApi;
 import com.interviewai.desktop.api.ProgressApi.Goal;
@@ -32,7 +33,7 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.Executor;
 import java.util.function.Consumer;
 
-public class ProgressController {
+public class ProgressController extends ScreenController {
 
     private final AccountSummary account;
     private final ProgressApi api;
@@ -176,6 +177,12 @@ public class ProgressController {
         });
     }
 
+    @Override
+    public void dispose() {
+        super.dispose();
+        countdown.stop();
+    }
+
     @FXML
     private void back() {
         navigator.showDashboard(account);
@@ -246,6 +253,6 @@ public class ProgressController {
             statusLabel.setText(task.getException() instanceof ApiException error
                     ? error.getMessage() : "Could not load or save progress. Try again.");
         });
-        executor.execute(task);
+        submit(task, executor);
     }
 }

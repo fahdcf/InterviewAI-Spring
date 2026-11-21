@@ -21,13 +21,17 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.time.Duration;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
+import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 
 public class DesktopApplication extends Application {
 
     private static final String DEFAULT_BACKEND_URL = "http://127.0.0.1:8080";
 
-    private final ExecutorService executor = Executors.newSingleThreadExecutor();
+    private final ExecutorService executor = new ThreadPoolExecutor(1, 1, 0, TimeUnit.SECONDS,
+            new ArrayBlockingQueue<>(16));
+    private DesktopNavigator navigator;
     private final HttpClient httpClient = HttpClient.newBuilder()
             .cookieHandler(new CookieManager(null, CookiePolicy.ACCEPT_ORIGINAL_SERVER))
             .connectTimeout(Duration.ofSeconds(3))
@@ -43,7 +47,7 @@ public class DesktopApplication extends Application {
         try {
             stage.setTitle("InterviewAI");
             ApiClient apiClient = new ApiClient(URI.create(backendAddress), httpClient);
-            DesktopNavigator navigator = new DesktopNavigator(stage, new AuthApi(apiClient),
+            navigator = new DesktopNavigator(stage, new AuthApi(apiClient),
                     new HealthApi(apiClient), new DashboardApi(apiClient), executor, new OnboardingApi(apiClient),
                     new CourseJobApi(apiClient), new PracticeApi(apiClient), new ProgressApi(apiClient),
                     new ProfileApi(apiClient), new AdminApi(apiClient), backendAddress);
@@ -61,6 +65,9 @@ public class DesktopApplication extends Application {
 
     @Override
     public void stop() {
+        if (navigator != null) {
+            navigator.dispose();
+        }
         executor.shutdownNow();
         httpClient.shutdownNow();
     }

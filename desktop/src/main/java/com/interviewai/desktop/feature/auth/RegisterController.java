@@ -1,6 +1,7 @@
 package com.interviewai.desktop.feature.auth;
 
 import com.interviewai.desktop.api.ApiException;
+import com.interviewai.desktop.navigation.ScreenController;
 import com.interviewai.desktop.api.AuthApi;
 import com.interviewai.desktop.navigation.DesktopNavigator;
 import javafx.concurrent.Task;
@@ -12,7 +13,7 @@ import javafx.scene.layout.VBox;
 
 import java.util.concurrent.Executor;
 
-public class RegisterController {
+public class RegisterController extends ScreenController {
 
     private final AuthApi authApi;
     private final DesktopNavigator navigator;
@@ -59,7 +60,7 @@ public class RegisterController {
                 statusLabel.setText("Could not create the account. Check the connection and try again.");
             }
         });
-        executor.execute(task);
+        submit(task, executor);
     }
 
     @FXML

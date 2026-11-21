@@ -33,6 +33,7 @@ import java.util.concurrent.Executor;
 public class DesktopNavigator {
 
     private final Stage stage;
+    private ScreenController currentScreen;
     private final AuthApi authApi;
     private final HealthApi healthApi;
     private final DashboardApi dashboardApi;
@@ -49,6 +50,7 @@ public class DesktopNavigator {
             OnboardingApi onboardingApi, CourseJobApi courseJobs, PracticeApi practice, ProgressApi progress,
             ProfileApi profile, AdminApi admin, String backendAddress) {
         this.stage = stage;
+        stage.setOnHidden(event -> dispose());
         this.authApi = authApi;
         this.healthApi = healthApi;
         this.dashboardApi = dashboardApi;
@@ -108,17 +110,26 @@ public class DesktopNavigator {
                 new ConnectionController(healthApi, executor, backendAddress, () -> showLogin("")));
     }
 
-    private void show(String view, Object controller) {
+    public void dispose() {
+        if (currentScreen != null) {
+            currentScreen.dispose();
+        }
+    }
+
+    private void show(String view, ScreenController controller) {
         FXMLLoader loader = new FXMLLoader(getClass().getResource("/fxml/" + view));
         loader.setControllerFactory(controllerType -> controller);
         try {
             Parent root = loader.load();
+            dispose();
+            currentScreen = controller;
             if (stage.getScene() == null) {
                 stage.setScene(new Scene(root));
             } else {
                 stage.getScene().setRoot(root);
             }
         } catch (IOException error) {
+            controller.dispose();
             throw new UncheckedIOException("Could not open " + view, error);
         }
     }

@@ -1,6 +1,7 @@
 package com.interviewai.desktop.feature.connection;
 
 import com.interviewai.desktop.api.HealthApi;
+import com.interviewai.desktop.navigation.ScreenController;
 import javafx.concurrent.Task;
 import javafx.fxml.FXML;
 import javafx.scene.control.Button;
@@ -8,7 +9,7 @@ import javafx.scene.control.Label;
 
 import java.util.concurrent.Executor;
 
-public class ConnectionController {
+public class ConnectionController extends ScreenController {
 
     private final HealthApi healthApi;
     private final Executor executor;
@@ -64,6 +65,6 @@ public class ConnectionController {
             statusLabel.setText("Could not connect. Check that the backend is running and retry.");
             retryButton.setDisable(false);
         });
-        executor.execute(task);
+        submit(task, executor);
     }
 }

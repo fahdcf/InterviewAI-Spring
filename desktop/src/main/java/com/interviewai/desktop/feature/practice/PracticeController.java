@@ -1,6 +1,7 @@
 package com.interviewai.desktop.feature.practice;
 
 import com.interviewai.desktop.api.AccountSummary;
+import com.interviewai.desktop.navigation.ScreenController;
 import com.interviewai.desktop.api.ApiException;
 import com.interviewai.desktop.api.PracticeApi;
 import com.interviewai.desktop.api.dto.AttemptResult;
@@ -23,7 +24,7 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.Executor;
 import java.util.function.Consumer;
 
-public class PracticeController {
+public class PracticeController extends ScreenController {
 
     private final AccountSummary account;
     private final PracticeApi api;
@@ -116,6 +117,13 @@ public class PracticeController {
     private void next() {
         index++;
         showQuestion();
+    }
+
+    @Override
+    public void dispose() {
+        super.dispose();
+        closed = true;
+        poll.stop();
     }
 
     @FXML
@@ -267,6 +275,6 @@ public class PracticeController {
                     ? error.getMessage() : "Could not reach the backend. Try again.");
             updateButtons(false);
         });
-        executor.execute(task);
+        submit(task, executor);
     }
 }

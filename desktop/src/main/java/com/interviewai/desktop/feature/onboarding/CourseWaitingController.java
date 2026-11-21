@@ -1,6 +1,7 @@
 package com.interviewai.desktop.feature.onboarding;
 
 import com.interviewai.desktop.api.AccountSummary;
+import com.interviewai.desktop.navigation.ScreenController;
 import com.interviewai.desktop.api.ApiException;
 import com.interviewai.desktop.api.CourseJobApi;
 import com.interviewai.desktop.api.dto.CourseJobStatus;
@@ -18,7 +19,7 @@ import java.util.UUID;
 import java.util.concurrent.Callable;
 import java.util.concurrent.Executor;
 
-public class CourseWaitingController {
+public class CourseWaitingController extends ScreenController {
 
     private final AccountSummary account;
     private final CourseJobApi api;
@@ -67,6 +68,13 @@ public class CourseWaitingController {
         }
     }
 
+    @Override
+    public void dispose() {
+        super.dispose();
+        closed = true;
+        nextPoll.stop();
+    }
+
     @FXML
     private void back() {
         closed = true;
@@ -109,7 +117,7 @@ public class CourseWaitingController {
                     ? error.getMessage() : "Could not reach the backend. Check the connection and retry.");
             retryButton.setDisable(false);
         });
-        executor.execute(task);
+        submit(task, executor);
     }
 
     private void display(CourseJobStatus latest) {

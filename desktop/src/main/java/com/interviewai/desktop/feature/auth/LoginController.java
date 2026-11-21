@@ -1,6 +1,7 @@
 package com.interviewai.desktop.feature.auth;
 
 import com.interviewai.desktop.api.AccountSummary;
+import com.interviewai.desktop.navigation.ScreenController;
 import com.interviewai.desktop.api.ApiException;
 import com.interviewai.desktop.api.AuthApi;
 import com.interviewai.desktop.navigation.DesktopNavigator;
@@ -13,7 +14,7 @@ import javafx.scene.layout.VBox;
 
 import java.util.concurrent.Executor;
 
-public class LoginController {
+public class LoginController extends ScreenController {
 
     private final AuthApi authApi;
     private final DesktopNavigator navigator;
@@ -64,7 +65,7 @@ public class LoginController {
                 statusLabel.setText("Could not sign in. Check the connection and try again.");
             }
         });
-        executor.execute(task);
+        submit(task, executor);
     }
 
     @FXML
