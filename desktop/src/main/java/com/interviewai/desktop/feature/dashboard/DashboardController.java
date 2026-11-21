@@ -32,6 +32,7 @@ public class DashboardController extends ScreenController {
     private final DashboardApi dashboard;
     private final DesktopNavigator navigator;
     private final Executor executor;
+    private final boolean onboardingWhenEmpty;
 
     @FXML private BorderPane dashboardPane;
     @FXML private Label welcomeLabel;
@@ -51,12 +52,13 @@ public class DashboardController extends ScreenController {
     private boolean rendering;
 
     public DashboardController(AccountSummary account, AuthApi auth, DashboardApi dashboard,
-            DesktopNavigator navigator, Executor executor) {
+            DesktopNavigator navigator, Executor executor, boolean onboardingWhenEmpty) {
         this.account = account;
         this.auth = auth;
         this.dashboard = dashboard;
         this.navigator = navigator;
         this.executor = executor;
+        this.onboardingWhenEmpty = onboardingWhenEmpty;
     }
 
     @FXML
@@ -160,6 +162,10 @@ public class DashboardController extends ScreenController {
     }
 
     private void render(DashboardResponse result) {
+        if (onboardingWhenEmpty && result.getCourses().isEmpty()) {
+            navigator.showOnboarding(account);
+            return;
+        }
         current = result;
         rendering = true;
         coursePicker.getItems().setAll(result.getCourses());

@@ -33,6 +33,7 @@ public class ProfileController extends ScreenController {
     @FXML private PasswordField confirmPassword;
     @FXML private Button deleteButton;
     @FXML private Label status;
+    @FXML private Label statistics;
 
     public ProfileController(AccountSummary account, ProfileApi api, DesktopNavigator navigator, Executor executor) {
         this.account = account;
@@ -46,6 +47,11 @@ public class ProfileController extends ScreenController {
         username.setText(account.getUsername());
         deleteButton.setVisible(!account.isAdministrator());
         deleteButton.setManaged(!account.isAdministrator());
+        run("Loading profile…", api::progress, progress -> {
+            statistics.setText(String.format("%,d XP · %d day streak · %d courses · %d completed chapters",
+                    progress.totalXp(), progress.streak(), progress.totalCourses(), progress.completedChapters()));
+            status.setText("");
+        });
     }
 
     @FXML

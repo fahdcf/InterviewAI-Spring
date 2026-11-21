@@ -44,9 +44,9 @@
                             <yAxis><NumberAxis tickLabelFill="#cbd5e1"/></yAxis>
                         </LineChart>
                         <FlowPane hgap="8" vgap="8">
-                            <PieChart fx:id="interviewTypes" title="Interview types" prefWidth="305"
+                            <PieChart animated="false" fx:id="interviewTypes" title="Interview types" prefWidth="305"
                                       prefHeight="220" styleClass="progress-chart"/>
-                            <PieChart fx:id="languages" title="Languages" prefWidth="305"
+                            <PieChart animated="false" fx:id="languages" title="Languages" prefWidth="305"
                                       prefHeight="220" styleClass="progress-chart"/>
                         </FlowPane>
                     </VBox>

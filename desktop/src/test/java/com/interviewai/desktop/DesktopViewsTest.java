@@ -34,6 +34,10 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 
 import java.io.IOException;
+import java.awt.image.BufferedImage;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import javax.imageio.ImageIO;
 import java.net.CookieManager;
 import java.net.InetSocketAddress;
 import java.net.URI;
@@ -157,6 +161,7 @@ class DesktopViewsTest {
                 press("Back to sign-in");
                 signIn("candidate");
                 waitForText("#xpLabel", "25 XP");
+                screenshot("dashboard");
 
                 press("Open lesson");
                 waitForText("#questionLabel", "Synthetic question");
@@ -198,10 +203,12 @@ class DesktopViewsTest {
                 press("Progress and quests");
                 waitForText("#summaryLabel", "25 XP");
                 assertNotNull(onFx(() -> node("#xpChart")));
+                screenshot("progress");
                 press("Back to dashboard");
                 waitForText("#xpLabel", "25 XP");
                 press("Profile");
                 assertNotNull(onFx(() -> node("#username")));
+                waitForText("#statistics", "25 XP");
                 press("Back");
                 waitForText("#xpLabel", "25 XP");
                 press("Sign out");
@@ -211,6 +218,7 @@ class DesktopViewsTest {
                 waitForText("#welcome", "Administration");
                 waitForText("#overview", "3 users");
                 assertNotNull(onFx(() -> node("#tabs")));
+                screenshot("admin");
             } finally {
                 onFx(() -> {
                     if (stage != null) {
@@ -243,9 +251,6 @@ class DesktopViewsTest {
             press("Create account");
             waitForText("#statusLabel", "Account created");
             signIn(username);
-            waitForText("#xpLabel", "0 XP");
-
-            press("Interview preferences");
             waitForButton("Generate courses");
             fill("#context", "Software developer");
             press("Generate courses");
@@ -417,6 +422,34 @@ class DesktopViewsTest {
                     .map(window -> (DialogPane) window.getScene().getRoot())
                     .findFirst().ifPresent(dialog -> ((Button) dialog.lookupButton(ButtonType.OK)).fire()));
             button(action).fire();
+            return null;
+        });
+    }
+
+    private void screenshot(String name) throws Exception {
+        String folder = System.getProperty("interviewai.screenshots");
+        if (folder == null) {
+            return;
+        }
+        onFx(() -> {
+            stage.setWidth(1100);
+            stage.setHeight(800);
+            return null;
+        });
+        Thread.sleep(150);
+        onFx(() -> {
+            stage.getScene().getRoot().applyCss();
+            stage.getScene().getRoot().layout();
+            var snapshot = stage.getScene().getRoot().snapshot(null, null);
+            BufferedImage image = new BufferedImage((int) snapshot.getWidth(), (int) snapshot.getHeight(),
+                    BufferedImage.TYPE_INT_ARGB);
+            for (int y = 0; y < image.getHeight(); y++) {
+                for (int x = 0; x < image.getWidth(); x++) {
+                    image.setRGB(x, y, snapshot.getPixelReader().getArgb(x, y));
+                }
+            }
+            Files.createDirectories(Path.of(folder));
+            ImageIO.write(image, "png", Path.of(folder, name + ".png").toFile());
             return null;
         });
     }

@@ -11,6 +11,10 @@ public class ProfileApi {
         this.api = api;
     }
 
+    public ProgressApi.Summary progress() throws IOException, InterruptedException {
+        return api.readJson("/api/v1/progress", ProgressApi.Summary.class);
+    }
+
     public AccountSummary rename(String username) throws IOException, InterruptedException {
         return api.writeJson("PATCH", "/api/v1/me", Map.of("username", username), AccountSummary.class);
     }

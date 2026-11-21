@@ -159,7 +159,17 @@ public class AdminRepository {
                 count("SELECT COUNT(*) FROM generated_courses"),
                 count("SELECT COUNT(*) FROM generated_courses WHERE status = 'COMPLETED'"),
                 count("SELECT COUNT(*) FROM chapters WHERE status = 'COMPLETED'"),
-                count("SELECT COUNT(*) FROM questions"), interviewTypes(), languages(), newAccounts(weekly), usage(weekly));
+                count("SELECT COUNT(*) FROM questions"),
+                count("SELECT COUNT(*) FROM questions WHERE status IN (\'COMPLETED\', \'INCORRECT\')"),
+                averageXp(), interviewTypes(), languages(), newAccounts(weekly), usage(weekly));
+    }
+
+    private double averageXp() {
+        Double average = jdbc.queryForObject("""
+                SELECT COALESCE((SELECT SUM(xp) FROM progress), 0) * 1.0
+                    / GREATEST((SELECT COUNT(*) FROM users), 1)
+                """, Double.class);
+        return average == null ? 0 : average;
     }
 
     private int count(String sql, Object... values) {

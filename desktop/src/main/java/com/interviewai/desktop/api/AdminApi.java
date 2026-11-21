@@ -70,6 +70,7 @@ public class AdminApi {
 
     public record Overview(int users, int activeUsers, int dailySignups, int weeklySignups, int monthlySignups,
                            int courses, int completedCourses, int completedChapters, int questions,
+                           int answeredQuestions, double averageXp,
                            Map<String, Long> interviewTypes, Map<String, Long> languages,
                            Map<String, Long> signupTrend, Map<String, Long> usageTrend) {
     }

@@ -285,9 +285,10 @@ public class AdminController extends ScreenController {
     private void showOverview(AdminApi.Overview summary) {
         overview.setText(String.format(
                 "%d users (%d active)   ·   %d courses (%d completed)%n"
-                        + "%d chapters completed   ·   %d questions%nSign-ups — today %d, last 7 days %d, this month %d",
+                        + "%d chapters completed   ·   %d questions%n%d answered questions   ·   %,.1f average XP%n"
+                        + "Sign-ups — today %d, last 7 days %d, this month %d",
                 summary.users(), summary.activeUsers(), summary.courses(), summary.completedCourses(),
-                summary.completedChapters(), summary.questions(), summary.dailySignups(),
+                summary.completedChapters(), summary.questions(), summary.answeredQuestions(), summary.averageXp(), summary.dailySignups(),
                 summary.weeklySignups(), summary.monthlySignups()));
         trends.getData().setAll(List.of(series("Sign-ups", summary.signupTrend()), series("Active learners", summary.usageTrend())));
         showPie(interviewTypes, summary.interviewTypes());

@@ -2,6 +2,11 @@
     -fx-font-family: "Segoe UI";
     -fx-font-size: 14px;
     -fx-background-color: #0f1419;
+    -fx-base: #1a2430;
+    -fx-control-inner-background: #161d25;
+    -fx-accent: #10b981;
+    -fx-focus-color: #10b981;
+    -fx-faint-focus-color: transparent;
 }
 
 .auth-dark {
@@ -59,4 +64,62 @@
 
 .progress-chart .chart-title {
     -fx-text-fill: #f1f5f9;
+}
+.combo-box .list-cell,
+.list-view .list-cell {
+    -fx-text-fill: #cbd5e1;
+}
+
+.list-view .list-cell:filled:selected {
+    -fx-background-color: #155e4f;
+    -fx-text-fill: white;
+}
+
+.chart-plot-background {
+    -fx-background-color: #161d25;
+}
+
+.chart-horizontal-grid-lines,
+.chart-vertical-grid-lines {
+    -fx-stroke: #2d3748;
+}
+
+.chart-legend {
+    -fx-background-color: transparent;
+}
+
+.chart-legend-item,
+.chart-pie-label {
+    -fx-text-fill: #cbd5e1;
+    -fx-fill: #cbd5e1;
+}
+
+.default-color0.chart-bar,
+.default-color0.chart-pie {
+    -fx-bar-fill: #10b981;
+    -fx-pie-color: #10b981;
+}
+
+.default-color0.chart-series-line {
+    -fx-stroke: #10b981;
+}
+
+.default-color0.chart-line-symbol {
+    -fx-background-color: #10b981, #161d25;
+}
+
+.default-color1.chart-series-line {
+    -fx-stroke: #38bdf8;
+}
+
+.default-color1.chart-line-symbol {
+    -fx-background-color: #38bdf8, #161d25;
+}
+
+.tab-pane .tab-header-background {
+    -fx-background-color: #161d25;
+}
+
+.tab .tab-label {
+    -fx-text-fill: #cbd5e1;
 }

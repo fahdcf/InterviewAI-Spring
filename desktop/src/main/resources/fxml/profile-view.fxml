@@ -14,6 +14,7 @@
     <VBox fx:id="form" spacing="12" styleClass="dark-root">
         <padding><Insets top="24" right="28" bottom="24" left="28"/></padding>
         <Label text="Your profile" styleClass="title-dark"/>
+        <Label fx:id="statistics" styleClass="subtitle-dark" wrapText="true"/>
         <Label text="Username" styleClass="subtitle-dark"/>
         <TextField fx:id="username" maxWidth="420" styleClass="input-dark"/>
         <Button text="Save username" onAction="#rename" styleClass="btn-primary-blue"/>

@@ -738,7 +738,12 @@ class AuthControllerTest {
         assertEquals(1, json.readTree(get("/admin/users?search=" + candidateName + "&status=SUSPENDED")
                 .body()).path("total").asInt());
         assertEquals(204, write("PATCH", user, Map.of("active", "true"), csrf()).statusCode());
-        assertEquals(200, get("/admin/overview").statusCode());
+        HttpResponse<String> overviewResponse = get("/admin/overview");
+        assertEquals(200, overviewResponse.statusCode());
+        JsonNode overview = json.readTree(overviewResponse.body());
+        assertEquals(jdbc.queryForObject("SELECT COUNT(*) FROM questions WHERE status IN (\'COMPLETED\', \'INCORRECT\')",
+                Integer.class), overview.path("answeredQuestions").asInt());
+        assertTrue(overview.path("averageXp").asDouble() >= 0);
 
         String course = "/admin/courses/" + courseId;
         assertEquals(204, write("PATCH", course, Map.of("status", "ARCHIVED"), csrf()).statusCode());

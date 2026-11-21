@@ -76,12 +76,17 @@ public class DesktopNavigator {
         if (account.isAdministrator()) {
             show("admin-view.fxml", new AdminController(account, admin, authApi, this, executor));
         } else {
-            showDashboard(account);
+            showDashboard(account, true);
         }
     }
 
     public void showDashboard(AccountSummary account) {
-        show("dashboard-view.fxml", new DashboardController(account, authApi, dashboardApi, this, executor));
+        showDashboard(account, false);
+    }
+
+    private void showDashboard(AccountSummary account, boolean onboardingWhenEmpty) {
+        show("dashboard-view.fxml", new DashboardController(account, authApi, dashboardApi, this, executor,
+                onboardingWhenEmpty));
     }
 
     public void showOnboarding(AccountSummary account) {
