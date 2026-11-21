@@ -4,6 +4,10 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.interviewai.backend.fixture.ProviderFixtures;
 import com.interviewai.backend.model.CourseJob;
+import com.interviewai.backend.model.AnswerGrade;
+import com.interviewai.backend.model.PracticeAttempt;
+import com.interviewai.backend.repository.PracticeRepository;
+import com.interviewai.backend.service.PracticeService;
 import com.interviewai.backend.model.GeneratedChapter;
 import com.interviewai.backend.model.GeneratedCourse;
 import com.interviewai.backend.model.GeneratedQuestion;
@@ -73,6 +77,8 @@ class AuthControllerTest {
     @Autowired private ObjectMapper json;
     @Autowired private JdbcTemplate jdbc;
     @Autowired private SaveGeneratedCourses courseSaver;
+    @Autowired private PracticeService practiceService;
+    @Autowired private PracticeRepository practiceRepository;
 
     private CookieManager cookies;
     private HttpClient client;
@@ -404,6 +410,23 @@ class AuthControllerTest {
                 .path("xpAwarded").asInt());
         assertTrue(json.readTree(get("/chapters/" + chapter + "/review").body()).isEmpty());
         assertEquals(10, json.readTree(get("/dashboard").body()).path("totalXp").asInt());
+    }
+
+    @Test
+    void staleGradingResultRollsBackProgressWhenItsAttemptWasReset() throws Exception {
+        int userId = registerAndSignIn();
+        int course = insertCourse(userId, "Reset race");
+        int chapter = insertChapter(course, "Reset chapter");
+        int question = addQuestion(chapter, "Explain the concept.", "SHORT_ANSWER");
+        long id = practiceRepository.addAttempt(userId, question, UUID.randomUUID().toString(),
+                "LESSON", "Saved answer", "RUNNING");
+        PracticeAttempt inFlight = practiceRepository.findAttempt(userId, id).orElseThrow();
+        jdbc.update("DELETE FROM practice_attempts WHERE id = ?", id);
+        assertThrows(IllegalStateException.class, () -> practiceService.completeGrading(inFlight,
+                new AnswerGrade(100, "Clear.", "Add examples.", "Expected explanation.")));
+        assertEquals("NOT_STARTED", jdbc.queryForObject("SELECT status FROM questions WHERE id = ?", String.class, question));
+        assertEquals("NOT_STARTED", jdbc.queryForObject("SELECT status FROM chapters WHERE id = ?", String.class, chapter));
+        assertEquals(0, json.readTree(get("/progress").body()).path("totalXp").asInt());
     }
 
     @Test

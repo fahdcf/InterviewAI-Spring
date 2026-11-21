@@ -170,7 +170,7 @@ public class PracticeRepository {
 
     public void updateQuestion(PracticeQuestion question, boolean passed) {
         jdbc.update("""
-                UPDATE questions SET status = ?, updated_at = CURRENT_TIMESTAMP
+                UPDATE questions SET status = ?, updated_at = CURRENT_TIMESTAMP(6)
                 WHERE id = ? AND status <> 'COMPLETED'
                 """, passed ? "COMPLETED" : "INCORRECT", question.id());
     }

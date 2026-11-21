@@ -32,3 +32,4 @@ V5 adds answer attempt history and V6 records quest claims. The backend uses a U
 V7 adds a session version to each account so password changes, suspension and role changes can invalidate signed-in sessions. The upgrade and restore rehearsal applied V2–V7 to a synthetic legacy database, then imported a dump of the upgraded database into a second MySQL instance.
 
 For HTTPS deployment, set `SESSION_COOKIE_SECURE=true` on the backend.
+V8 increases question-update and daily-reset timestamps to microsecond precision. This preserves existing timestamps and lets a newly earned daily cycle include answers submitted in the same second as the previous claim. The MySQL calendar tests verify consecutive cycles, monthly rollover and rollback after a failed claim write.
