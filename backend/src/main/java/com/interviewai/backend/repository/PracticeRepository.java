@@ -113,6 +113,27 @@ public class PracticeRepository {
         return java.util.Objects.requireNonNull(key.getKey(), "Missing attempt ID.").longValue();
     }
 
+    public int pendingCount(int userId) {
+        return jdbc.queryForObject("SELECT COUNT(*) FROM practice_attempts WHERE user_id = ?"
+                + " AND status IN ('QUEUED', 'RUNNING')", Integer.class, userId);
+    }
+
+    public Map<Integer, PracticeAttempt> latestAttempts(int userId, int courseId) {
+        List<PracticeAttempt> attempts = jdbc.query(ATTEMPTS + """
+                 WHERE id IN (
+                    SELECT MAX(a.id) FROM practice_attempts a
+                    JOIN questions q ON q.id = a.question_id
+                    JOIN chapters c ON c.id = q.chapter_id
+                    WHERE a.user_id = ? AND c.course_id = ? GROUP BY a.question_id
+                 )
+                """, this::mapAttempt, userId, courseId);
+        Map<Integer, PracticeAttempt> latest = new HashMap<>();
+        for (PracticeAttempt attempt : attempts) {
+            latest.put(attempt.questionId(), attempt);
+        }
+        return latest;
+    }
+
     public Optional<PracticeAttempt> nextQueued() {
         return jdbc.query(ATTEMPTS + " WHERE status = 'QUEUED' ORDER BY id LIMIT 1", this::mapAttempt)
                 .stream().findFirst();

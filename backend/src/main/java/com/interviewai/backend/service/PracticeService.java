@@ -42,7 +42,7 @@ public class PracticeService {
         if (!practice.ownsChapter(userId, chapterId)) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Chapter unavailable.");
         }
-        return responses(practice.listQuestions(userId, chapterId, review));
+        return responses(userId, practice.listQuestions(userId, chapterId, review));
     }
 
     @Transactional(readOnly = true)
@@ -50,7 +50,7 @@ public class PracticeService {
         if (courses.findAvailableCourse(userId, courseId).isEmpty()) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Course unavailable.");
         }
-        return responses(practice.listCourseReview(userId, courseId));
+        return responses(userId, practice.listCourseReview(userId, courseId));
     }
 
     @Transactional
@@ -72,6 +72,9 @@ public class PracticeService {
                 throw new ResponseStatusException(HttpStatus.CONFLICT, "This request ID belongs to another answer.");
             }
             return AttemptResponse.from(previous);
+        }
+        if (practice.pendingCount(userId) >= 10) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Wait for your pending answers before submitting more.");
         }
         if ("REVIEW".equals(request.getMode()) && !"INCORRECT".equals(question.status())) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "This question is no longer in review.");
@@ -149,15 +152,18 @@ public class PracticeService {
         practice.complete(attempt.id(), grade, xp);
     }
 
-    private List<PracticeQuestionResponse> responses(List<PracticeQuestion> questions) {
+    private List<PracticeQuestionResponse> responses(int userId, List<PracticeQuestion> questions) {
         if (questions.isEmpty()) {
             return List.of();
         }
         Map<Integer, List<String>> choices = practice.findCourseChoices(questions.getFirst().courseId());
+        Map<Integer, PracticeAttempt> attempts = practice.latestAttempts(userId, questions.getFirst().courseId());
         List<PracticeQuestionResponse> responses = new ArrayList<>();
         for (PracticeQuestion question : questions) {
+            PracticeAttempt saved = attempts.get(question.id());
             responses.add(new PracticeQuestionResponse(question.id(), question.chapterId(), question.text(),
-                    question.type(), question.status(), choices.getOrDefault(question.id(), List.of())));
+                    question.type(), question.status(), choices.getOrDefault(question.id(), List.of()),
+                    saved == null ? null : AttemptResponse.from(saved)));
         }
         return responses;
     }

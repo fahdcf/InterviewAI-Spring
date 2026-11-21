@@ -223,6 +223,19 @@ public class PracticeController extends ScreenController {
             choices.getChildren().add(option);
         }
         updateButtons(false);
+        AttemptResult saved = question.savedAttempt();
+        String mode = review ? "REVIEW" : "LESSON";
+        if (saved != null && mode.equals(saved.mode()) && !"GRADED".equals(saved.status())) {
+            submittedAnswer = saved.answer();
+            submittedSkip = false;
+            answer.setText(saved.answer() == null ? "" : saved.answer());
+            for (javafx.scene.control.Toggle option : options.getToggles()) {
+                if (java.util.Objects.equals(option.getUserData(), saved.answer())) {
+                    option.setSelected(true);
+                }
+            }
+            showResult(saved);
+        }
     }
 
     private void setAnswerVisible(boolean visible) {

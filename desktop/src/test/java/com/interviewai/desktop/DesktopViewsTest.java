@@ -160,6 +160,9 @@ class DesktopViewsTest {
 
                 press("Open lesson");
                 waitForText("#questionLabel", "Synthetic question");
+                waitForText("#status", "Provider was unavailable.");
+                assertTrue(onFx(() -> node("#choices").lookupAll(".radio-button").stream()
+                        .map(RadioButton.class::cast).anyMatch(option -> option.isSelected() && "Two".equals(option.getText()))));
                 press("Skip");
                 waitForText("#status", "Question skipped.");
                 press("Back to dashboard");
@@ -456,7 +459,9 @@ class DesktopViewsTest {
                     """;
             case "/api/v1/chapters/2/questions" -> """
                     [{"id":1,"chapterId":2,"text":"Synthetic question","type":"MULTIPLE_CHOICE",
-                      "status":"NOT_STARTED","choices":["One","Two"]}]
+                      "status":"NOT_STARTED","choices":["One","Two"],
+                      "savedAttempt":{"id":7,"status":"FAILED","mode":"LESSON","answer":"Two",
+                        "explanation":"Provider was unavailable.","xpAwarded":0}}]
                     """;
             case "/api/v1/questions/1/attempts" -> """
                     {"id":1,"status":"GRADED","score":0,"explanation":"Expected answer: One","xpAwarded":0}

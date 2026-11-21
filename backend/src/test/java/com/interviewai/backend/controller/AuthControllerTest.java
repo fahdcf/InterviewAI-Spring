@@ -407,6 +407,37 @@ class AuthControllerTest {
     }
 
     @Test
+    void concurrentCorrectAnswersAwardXpOnceAndBoundPendingWork() throws Exception {
+        int userId = registerAndSignIn();
+        int course = insertCourse(userId, "Concurrent practice");
+        int chapter = insertChapter(course, "Concurrent chapter");
+        int question = addQuestion(chapter, "Choose an answer.", "MULTIPLE_CHOICE");
+        String path = "/questions/" + question + "/attempts";
+        JsonNode token = csrf();
+        Map<String, String> first = Map.of("mode", "LESSON", "answer", "Expected", "requestId", UUID.randomUUID().toString());
+        Map<String, String> second = Map.of("mode", "LESSON", "answer", "Expected", "requestId", UUID.randomUUID().toString());
+        CompletableFuture<HttpResponse<String>> pending = client.sendAsync(
+                writeRequest("POST", path, first, token), HttpResponse.BodyHandlers.ofString());
+        HttpResponse<String> other = post(path, second, token);
+        HttpResponse<String> completed = pending.get(5, TimeUnit.SECONDS);
+        assertEquals(200, completed.statusCode(), completed.body());
+        assertEquals(200, other.statusCode(), other.body());
+        assertEquals(10, json.readTree(completed.body()).path("xpAwarded").asInt()
+                + json.readTree(other.body()).path("xpAwarded").asInt());
+
+        for (int count = 0; count < 10; count++) {
+            jdbc.update("""
+                    INSERT INTO practice_attempts (user_id, question_id, request_id, mode, answer, status)
+                    VALUES (?, ?, ?, 'LESSON', 'Saved answer', 'RUNNING')
+                    """, userId, question, UUID.randomUUID().toString());
+        }
+        assertEquals(409, post(path, Map.of("mode", "LESSON", "answer", "Other",
+                "requestId", UUID.randomUUID().toString()), csrf()).statusCode());
+        assertEquals(200, post(path, first, csrf()).statusCode());
+        jdbc.update("UPDATE practice_attempts SET status = 'FAILED' WHERE user_id = ? AND status = 'RUNNING'", userId);
+    }
+
+    @Test
     void shortAnswersUseThePassingThresholdAndFailuresLeaveProgressAlone() throws Exception {
         int userId = registerAndSignIn();
         int course = insertCourse(userId, "Short answers");
@@ -415,6 +446,10 @@ class AuthControllerTest {
         JsonNode failure = awaitAttempt(answer(question, "LESSON", "unavailable", UUID.randomUUID().toString(), 202));
         assertEquals("FAILED", failure.path("status").asText());
         assertEquals("NOT_STARTED", jdbc.queryForObject("SELECT status FROM questions WHERE id = ?", String.class, question));
+        JsonNode resumed = json.readTree(get("/chapters/" + chapter + "/questions").body()).get(0).path("savedAttempt");
+        assertEquals("unavailable", resumed.path("answer").asText());
+        assertEquals("FAILED", resumed.path("status").asText());
+        assertEquals("LESSON", resumed.path("mode").asText());
 
         JsonNode below = awaitAttempt(answer(question, "LESSON", "partial", UUID.randomUUID().toString(), 202));
         assertEquals(69, below.path("score").asInt());
