@@ -1,6 +1,7 @@
 package com.interviewai.desktop.api;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.io.IOException;
@@ -21,7 +22,8 @@ public class ApiClient {
 
     private final URI baseUrl;
     private final HttpClient httpClient;
-    private final ObjectMapper objectMapper = new ObjectMapper();
+    private final ObjectMapper objectMapper = new ObjectMapper()
+            .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
 
     public ApiClient(URI baseUrl, HttpClient httpClient) {
         String scheme = baseUrl.getScheme();

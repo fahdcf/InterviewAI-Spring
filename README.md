@@ -91,3 +91,6 @@ To run the backend tests against a separate MySQL database, configure `TEST_DB_U
 Run `.\mvnw.cmd -pl desktop -Pui-tests test` from an interactive desktop to check the JavaFX views. To build the Windows desktop ZIP and runnable backend JAR, run `.\scripts\package-windows.ps1`. See the [migration status](docs/migration-status.md) and [release checklist](docs/release-checklist.md) for verification and remaining release checks.
 
 The Windows verification used Temurin JDK 21.0.11, Spring Boot 3.5.16, JavaFX 21.0.11, and MySQL 8.4.13. Flyway applies migrations through V7.
+## API contract
+
+The backend serves its OpenAPI JSON at `/v3/api-docs` and YAML at `/v3/api-docs.yaml`. The contract includes request and response DTOs, multipart uploads, page parameters, session and CSRF requirements, errors, and job states. Read it alongside the controller methods when implementing a desktop feature. A backend test compares documented routes with the registered controllers.

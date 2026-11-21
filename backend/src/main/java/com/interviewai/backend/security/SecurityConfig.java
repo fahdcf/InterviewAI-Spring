@@ -50,7 +50,8 @@ public class SecurityConfig {
                 .csrf(csrf -> csrf.csrfTokenRepository(csrfTokens))
                 .requestCache(cache -> cache.disable())
                 .authorizeHttpRequests(requests -> requests
-                        .requestMatchers(HttpMethod.GET, "/api/v1/health", "/api/v1/auth/csrf").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/v1/health", "/api/v1/auth/csrf",
+                                "/v3/api-docs", "/v3/api-docs.yaml").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/v1/auth/login", "/api/v1/auth/register").permitAll()
                         .requestMatchers("/api/v1/admin/users", "/api/v1/admin/users/**")
                         .hasAnyAuthority("ROLE_SUPER_ADMIN", "manage_users")
