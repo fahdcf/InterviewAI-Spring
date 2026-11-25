@@ -30,7 +30,7 @@ public class AccountSessionFilter extends OncePerRequestFilter {
             throws ServletException, IOException {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         if (authentication == null || !(authentication.getPrincipal() instanceof AccountPrincipal account)
-                || accounts.isSessionCurrent(account.getUserId(), account.getSessionVersion())) {
+                || accounts.existsByIdAndActiveTrueAndSessionVersion(account.getUserId(), account.getSessionVersion())) {
             chain.doFilter(request, response);
             return;
         }

@@ -23,7 +23,7 @@ public class CourseJobService {
     @Transactional
     public CourseJob start(int userId, String requestId, Long retryJobId) {
         accounts.lockActiveAccount(userId);
-        Optional<CourseJob> existing = jobs.findByRequest(userId, requestId);
+        Optional<CourseJob> existing = jobs.findByUserIdAndRequestId(userId, requestId);
         if (existing.isPresent()) {
             return existing.get();
         }
@@ -38,18 +38,18 @@ public class CourseJobService {
             throw new ResponseStatusException(HttpStatus.CONFLICT,
                     "A course is already being generated. Open Generation status from the dashboard.");
         }
-        if (!jobs.queue(userId, requestId)) {
+        if (jobs.queue(userId, requestId) != 1) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Save interview preferences first.");
         }
-        return jobs.findByRequest(userId, requestId).orElseThrow();
+        return jobs.findByUserIdAndRequestId(userId, requestId).orElseThrow();
     }
 
     public CourseJob get(int userId, long jobId) {
-        return jobs.find(userId, jobId)
+        return jobs.findByUserIdAndId(userId, jobId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Generation job unavailable."));
     }
 
     public Optional<CourseJob> latest(int userId) {
-        return jobs.findLatest(userId);
+        return jobs.findFirstByUserIdOrderByIdDesc(userId);
     }
 }

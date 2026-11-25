@@ -6,6 +6,7 @@ import com.interviewai.backend.fixture.ProviderFixtures;
 import com.interviewai.backend.model.CourseJob;
 import com.interviewai.backend.model.AnswerGrade;
 import com.interviewai.backend.model.PracticeAttempt;
+import com.interviewai.backend.model.entity.AnswerAttempt;
 import com.interviewai.backend.repository.PracticeRepository;
 import com.interviewai.backend.service.PracticeService;
 import com.interviewai.backend.model.GeneratedChapter;
@@ -47,6 +48,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
@@ -324,6 +326,24 @@ class AuthControllerTest {
     }
 
     @Test
+    void staleGenerationJobRollsBackThePairAndNavigation() throws Exception {
+        int userId = registerAndSignIn();
+        GeneratedQuestion question = new GeneratedQuestion("A question?", "MULTIPLE_CHOICE",
+                "Expected", "Explanation", List.of("Expected", "Other"));
+        GeneratedCourse course = new GeneratedCourse("Course",
+                List.of(new GeneratedChapter(1, "Chapter", "Topics", List.of(question))));
+        CourseJob staleJob = new CourseJob(-1, userId, "RUNNING", 95, "Saving", null, null);
+
+        assertThrows(IllegalStateException.class, () -> courseSaver.save(staleJob, course, course));
+
+        assertEquals(0, jdbc.queryForObject("SELECT COUNT(*) FROM generated_courses WHERE user_id = ?",
+                Integer.class, userId));
+        assertEquals(0, jdbc.queryForObject("SELECT COUNT(*) FROM interview_prep WHERE user_id = ?",
+                Integer.class, userId));
+        assertNull(jdbc.queryForObject("SELECT last_course_id FROM users WHERE id = ?", Integer.class, userId));
+    }
+
+    @Test
     void generationSavesBothCoursesAndDeduplicatesRepeatedRequests() throws Exception {
         int userId = registerAndSignIn();
         saveGenerationInput("Software developer");
@@ -484,9 +504,9 @@ class AuthControllerTest {
         int course = insertCourse(userId, "Reset race");
         int chapter = insertChapter(course, "Reset chapter");
         int question = addQuestion(chapter, "Explain the concept.", "SHORT_ANSWER");
-        long id = practiceRepository.addAttempt(userId, question, UUID.randomUUID().toString(),
-                "LESSON", "Saved answer", "RUNNING");
-        PracticeAttempt inFlight = practiceRepository.findAttempt(userId, id).orElseThrow();
+        long id = practiceRepository.save(new AnswerAttempt(userId, question, UUID.randomUUID().toString(),
+                "LESSON", "Saved answer", "RUNNING")).getId();
+        PracticeAttempt inFlight = practiceRepository.findByUserIdAndId(userId, id).orElseThrow();
         jdbc.update("DELETE FROM practice_attempts WHERE id = ?", id);
         assertThrows(IllegalStateException.class, () -> practiceService.completeGrading(inFlight,
                 new AnswerGrade(100, "Clear.", "Add examples.", "Expected explanation.")));
@@ -788,7 +808,8 @@ class AuthControllerTest {
         int course = insertCourse(userId, "Owned course");
         int chapter = insertChapter(course, "Owned chapter");
         int question = addQuestion(chapter, "Owned question?", "MULTIPLE_CHOICE");
-        practiceRepository.addAttempt(userId, question, UUID.randomUUID().toString(), "LESSON", "Other", "FAILED");
+        practiceRepository.save(new AnswerAttempt(userId, question, UUID.randomUUID().toString(),
+                "LESSON", "Other", "FAILED"));
         jdbc.update("INSERT INTO user_goals (user_id, goal_name, goal_type, target_value, start_value)"
                 + " VALUES (?, 'Owned goal', 'XP', 100, 0)", userId);
         jdbc.update("INSERT INTO onboarding_cv (user_id, extracted_text) VALUES (?, 'Synthetic resume')", userId);
@@ -891,6 +912,30 @@ class AuthControllerTest {
         assertEquals(204, write("PATCH", course, Map.of("status", "ACTIVE"), csrf()).statusCode());
         assertEquals(204, write("DELETE", course, Map.of(), csrf()).statusCode());
         assertEquals(404, get(course).statusCode());
+    }
+
+    @Test
+    void adminSearchRetainsBackslashEscaping() throws Exception {
+        int adminId = registerAndSignIn();
+        jdbc.update("INSERT INTO user_roles (user_id, role_id) SELECT ?, id FROM roles WHERE name = 'SUPER_ADMIN'",
+                adminId);
+        assertEquals(200, login(username, PASSWORD).statusCode());
+        String prefix = username + "-escaped";
+        jdbc.update("INSERT INTO users (username) VALUES (?), (?)", prefix + "_name", prefix + "Xname");
+        int matchingCourse = insertCourse(adminId, prefix + "_course");
+        insertCourse(adminId, prefix + "Xcourse");
+
+        HttpResponse<String> usersResponse = get("/admin/users?search=" + prefix + "%5C_");
+        assertEquals(200, usersResponse.statusCode(), usersResponse.body());
+        JsonNode users = json.readTree(usersResponse.body());
+        assertEquals(1, users.path("total").asInt());
+        assertEquals(prefix + "_name", users.path("items").get(0).path("username").asText());
+
+        HttpResponse<String> coursesResponse = get("/admin/courses?search=" + prefix + "%5C_course");
+        assertEquals(200, coursesResponse.statusCode(), coursesResponse.body());
+        JsonNode courses = json.readTree(coursesResponse.body());
+        assertEquals(1, courses.path("total").asInt());
+        assertEquals(matchingCourse, courses.path("items").get(0).path("id").asInt());
     }
 
     private URI uri(String path) {

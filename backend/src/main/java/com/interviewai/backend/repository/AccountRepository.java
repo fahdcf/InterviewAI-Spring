@@ -1,127 +1,137 @@
 package com.interviewai.backend.repository;
 
 import com.interviewai.backend.model.Account;
-import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.jdbc.support.GeneratedKeyHolder;
-import org.springframework.stereotype.Repository;
+import com.interviewai.backend.model.entity.UserAccount;
+import jakarta.persistence.LockModeType;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.transaction.annotation.Transactional;
 
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.SQLException;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
-@Repository
-public class AccountRepository {
+public interface AccountRepository extends JpaRepository<UserAccount, Integer> {
 
-    private static final String ACCOUNT_COLUMNS =
-            "SELECT id, username, email, password_hash, is_active, session_version FROM users";
+    Optional<UserAccount> findByUsername(String username);
+    Optional<UserAccount> findByEmail(String email);
+    boolean existsByIdAndActiveTrueAndSessionVersion(int id, int version);
+    int countByActiveTrue();
+    int countByCreatedAtGreaterThanEqual(LocalDateTime start);
 
-    private final JdbcTemplate jdbc;
-
-    public AccountRepository(JdbcTemplate jdbc) {
-        this.jdbc = jdbc;
+    default Optional<Account> findByLogin(String identifier) {
+        return findByUsername(identifier).or(() -> findByEmail(identifier)).map(AccountRepository::account);
     }
 
-    public Optional<Account> findByLogin(String identifier) {
-        Optional<Account> usernameMatch = jdbc.query(
-                ACCOUNT_COLUMNS + " WHERE username = ?", this::mapAccount, identifier)
-                .stream().findFirst();
-        if (usernameMatch.isPresent()) {
-            return usernameMatch;
-        }
-        return jdbc.query(ACCOUNT_COLUMNS + " WHERE email = ?", this::mapAccount, identifier)
-                .stream().findFirst();
+    default Optional<Account> findAccount(int id) {
+        return findById(id).map(AccountRepository::account);
     }
 
-    public Optional<Account> findById(int id) {
-        return jdbc.query(ACCOUNT_COLUMNS + " WHERE id = ?", this::mapAccount, id)
-                .stream().findFirst();
+    private static Account account(UserAccount user) {
+        return new Account(user.getId(), user.getUsername(), user.getEmail(), user.getPasswordHash(),
+                user.isActive(), user.getSessionVersion());
     }
 
-    public boolean lockActiveAccount(int id) {
-        List<Boolean> rows = jdbc.query("SELECT is_active FROM users WHERE id = ? FOR UPDATE",
-                (row, index) -> row.getBoolean("is_active"), id);
-        return !rows.isEmpty() && rows.getFirst();
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select u from UserAccount u where u.id = :id")
+    Optional<UserAccount> lockById(int id);
+
+    @Query("select r.name from UserAccount u join u.roles r where u.id = :userId order by r.name")
+    List<String> findRoles(int userId);
+
+    @Query("""
+            select distinct p.name from UserAccount u join u.roles r join r.permissions p
+            where u.id = :userId order by p.name
+            """)
+    List<String> findPermissions(int userId);
+
+    @Transactional
+    @Modifying
+    @Query("update UserAccount u set u.passwordHash = :newHash where u.id = :userId and u.passwordHash = :oldHash")
+    void upgradePasswordHash(int userId, String oldHash, String newHash);
+
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("update UserAccount u set u.username = :username where u.id = :userId")
+    void updateUsername(int userId, String username);
+
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("""
+            update UserAccount u set u.passwordHash = :password, u.sessionVersion = u.sessionVersion + 1
+            where u.id = :userId
+            """)
+    void changePassword(int userId, String password);
+
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("update UserAccount u set u.lastCourseId = :courseId, u.lastChapterId = :chapterId where u.id = :userId")
+    void saveLocation(int userId, int courseId, Integer chapterId);
+
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("""
+            update UserAccount u set u.dailyQuestLastReset = :now, u.lastDailyQuestClaim = :today
+            where u.id = :userId
+            """)
+    void recordDailyReset(int userId, LocalDate today, LocalDateTime now);
+
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("update UserAccount u set u.lastMonthlyQuestClaim = :today where u.id = :userId")
+    void recordMonthlyClaim(int userId, LocalDate today);
+
+    @Query("select u.dailyQuestLastReset from UserAccount u where u.id = :userId")
+    LocalDateTime dailyReset(int userId);
+
+    @Query("select u.lastMonthlyQuestClaim from UserAccount u where u.id = :userId")
+    LocalDate monthlyClaimDate(int userId);
+
+    String ADMIN_USER = """
+            select u.id as id, u.username as username, u.email as email, u.active as active, u.createdAt as createdAt,
+                   (select coalesce(sum(p.xp), 0) from ProgressEvent p where p.userId = u.id) as xp,
+                   (select count(c) from Course c where c.userId = u.id) as courseCount
+            from UserAccount u
+            """;
+    String ADMIN_FILTER = """
+            where (lower(u.username) like :search escape '\\'
+                or lower(coalesce(u.email, '')) like :search escape '\\')
+                and (:status = '' or u.active = case when :status = 'ACTIVE' then true else false end)
+                and (:role = '' or exists (select 1 from u.roles r where r.name = :role))
+            """;
+
+    @Query(value = ADMIN_USER + ADMIN_FILTER + " order by u.id desc",
+            countQuery = "select count(u) from UserAccount u " + ADMIN_FILTER)
+    Page<UserSummary> findAdminUsers(String search, String status, String role, Pageable page);
+
+    @Query(ADMIN_USER + " where u.id = :id")
+    Optional<UserSummary> findAdminUser(int id);
+
+    @Query("""
+            select u.id as userId, r.name as role from UserAccount u join u.roles r
+            where u.id in :ids order by r.name
+            """)
+    List<UserRole> findRolesForUsers(List<Integer> ids);
+
+    @Query("""
+            select cast(u.createdAt as LocalDate) as day, count(u) as total
+            from UserAccount u where u.createdAt >= :start
+            group by cast(u.createdAt as LocalDate) order by day
+            """)
+    List<DailyCount> countNewAccounts(LocalDateTime start);
+
+    interface UserSummary {
+        int getId();
+        String getUsername();
+        String getEmail();
+        Boolean getActive();
+        LocalDateTime getCreatedAt();
+        long getXp();
+        int getCourseCount();
     }
 
-    public List<String> findRoles(int userId) {
-        return jdbc.queryForList("""
-                SELECT r.name
-                FROM user_roles ur JOIN roles r ON r.id = ur.role_id
-                WHERE ur.user_id = ?
-                ORDER BY r.name
-                """, String.class, userId);
-    }
-
-    public List<String> findPermissions(int userId) {
-        return jdbc.queryForList("""
-                SELECT DISTINCT p.name
-                FROM user_roles ur
-                JOIN role_permissions rp ON rp.role_id = ur.role_id
-                JOIN permissions p ON p.id = rp.permission_id
-                WHERE ur.user_id = ?
-                ORDER BY p.name
-                """, String.class, userId);
-    }
-
-    public int insertCandidate(String username, String email, String passwordHash) {
-        GeneratedKeyHolder keyHolder = new GeneratedKeyHolder();
-        jdbc.update(connection -> {
-            PreparedStatement statement = connection.prepareStatement(
-                    "INSERT INTO users (username, email, password_hash) VALUES (?, ?, ?)",
-                    new String[]{"id"});
-            statement.setString(1, username);
-            statement.setString(2, email);
-            statement.setString(3, passwordHash);
-            return statement;
-        }, keyHolder);
-
-        Number id = keyHolder.getKey();
-        if (id == null) {
-            throw new IllegalStateException("The database did not return the new user ID.");
-        }
-        int assigned = jdbc.update("""
-                INSERT INTO user_roles (user_id, role_id)
-                SELECT ?, id FROM roles WHERE name = 'CANDIDATE'
-                """, id.intValue());
-        if (assigned != 1) {
-            throw new IllegalStateException("The candidate role is missing.");
-        }
-        return id.intValue();
-    }
-
-    public void upgradePasswordHash(int userId, String oldHash, String newHash) {
-        jdbc.update("UPDATE users SET password_hash = ? WHERE id = ? AND password_hash = ?",
-                newHash, userId, oldHash);
-    }
-
-    public boolean isSessionCurrent(int userId, int version) {
-        Integer count = jdbc.queryForObject("""
-                SELECT COUNT(*) FROM users WHERE id = ? AND is_active = TRUE AND session_version = ?
-                """, Integer.class, userId, version);
-        return count != null && count == 1;
-    }
-
-    public void updateUsername(int userId, String username) {
-        jdbc.update("UPDATE users SET username = ? WHERE id = ?", username, userId);
-    }
-
-    public void changePassword(int userId, String encodedPassword) {
-        jdbc.update("UPDATE users SET password_hash = ?, session_version = session_version + 1 WHERE id = ?",
-                encodedPassword, userId);
-    }
-
-    public void deleteAccount(int userId) {
-        jdbc.update("DELETE FROM progress WHERE user_id = ?", userId);
-        jdbc.update("DELETE FROM feedback WHERE user_id = ? OR course_id IN (SELECT id FROM generated_courses WHERE user_id = ?)",
-                userId, userId);
-        jdbc.update("DELETE FROM generated_courses WHERE user_id = ?", userId);
-        jdbc.update("DELETE FROM users WHERE id = ?", userId);
-    }
-
-    private Account mapAccount(ResultSet row, int rowNumber) throws SQLException {
-        return new Account(row.getInt("id"), row.getString("username"), row.getString("email"),
-                row.getString("password_hash"), row.getBoolean("is_active"), row.getInt("session_version"));
+    interface UserRole {
+        int getUserId();
+        String getRole();
     }
 }

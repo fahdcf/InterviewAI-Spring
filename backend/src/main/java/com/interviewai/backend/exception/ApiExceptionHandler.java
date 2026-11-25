@@ -1,5 +1,7 @@
 package com.interviewai.backend.exception;
 
+import org.hibernate.exception.ConstraintViolationException;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -45,6 +47,15 @@ public class ApiExceptionHandler {
     @ResponseStatus(HttpStatus.CONFLICT)
     public Map<String, String> duplicateAccount() {
         return Map.of("message", "That username or email is already in use.");
+    }
+
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    public ResponseEntity<Map<String, String>> integrityViolation(DataIntegrityViolationException error) {
+        if (error.getCause() instanceof ConstraintViolationException constraint
+                && ("23505".equals(constraint.getSQLState()) || constraint.getErrorCode() == 1062)) {
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(duplicateAccount());
+        }
+        throw error;
     }
 
     @ExceptionHandler(AuthenticationException.class)

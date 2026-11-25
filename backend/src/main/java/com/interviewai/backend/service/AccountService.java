@@ -3,7 +3,10 @@ package com.interviewai.backend.service;
 import com.interviewai.backend.dto.request.RegisterRequest;
 import com.interviewai.backend.dto.response.AccountResponse;
 import com.interviewai.backend.model.Account;
+import com.interviewai.backend.model.entity.Role;
+import com.interviewai.backend.model.entity.UserAccount;
 import com.interviewai.backend.repository.AccountRepository;
+import com.interviewai.backend.repository.RoleRepository;
 import com.interviewai.backend.security.AccountPasswordEncoder;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.security.authentication.BadCredentialsException;
@@ -17,10 +20,12 @@ public class AccountService {
 
     private final AccountRepository accounts;
     private final AccountPasswordEncoder passwordEncoder;
+    private final RoleRepository roles;
 
-    public AccountService(AccountRepository accounts, AccountPasswordEncoder passwordEncoder) {
+    public AccountService(AccountRepository accounts, AccountPasswordEncoder passwordEncoder, RoleRepository roles) {
         this.accounts = accounts;
         this.passwordEncoder = passwordEncoder;
+        this.roles = roles;
     }
 
     @Transactional
@@ -37,8 +42,11 @@ public class AccountService {
             throw new DuplicateKeyException("Email already in use.");
         }
         String hash = passwordEncoder.encode(request.getPassword());
-        int id = accounts.insertCandidate(username, email, hash);
-        return getActiveAccount(id);
+        Role role = roles.findByName("CANDIDATE")
+                .orElseThrow(() -> new IllegalStateException("The candidate role is missing."));
+        UserAccount account = new UserAccount(username, email, hash);
+        account.addRole(role);
+        return getActiveAccount(accounts.saveAndFlush(account).getId());
     }
 
     public AccountResponse getActiveAccount(int userId) {
@@ -53,7 +61,7 @@ public class AccountService {
     }
 
     public void lockActiveAccount(int userId) {
-        if (!accounts.lockActiveAccount(userId)) {
+        if (accounts.lockById(userId).filter(UserAccount::isActive).isEmpty()) {
             throw new BadCredentialsException("Sign in again.");
         }
     }
@@ -68,7 +76,7 @@ public class AccountService {
     }
 
     private Account findActiveAccount(int userId) {
-        return accounts.findById(userId).filter(Account::isActive)
+        return accounts.findAccount(userId).filter(Account::isActive)
                 .orElseThrow(() -> new BadCredentialsException("Sign in again."));
     }
 }

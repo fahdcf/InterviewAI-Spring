@@ -60,22 +60,22 @@ class RestartRecoveryTest {
             try (ConfigurableApplicationContext restarted = start(origin)) {
                 CourseJobRepository jobs = restarted.getBean(CourseJobRepository.class);
                 PracticeRepository attempts = restarted.getBean(PracticeRepository.class);
-                assertEquals("INTERRUPTED", jobs.find(userId, runningJob).orElseThrow().getStatus());
-                assertEquals("FAILED", attempts.findAttempt(userId, runningAttempt).orElseThrow().status());
+                assertEquals("INTERRUPTED", jobs.findByUserIdAndId(userId, runningJob).orElseThrow().getStatus());
+                assertEquals("FAILED", attempts.findByUserIdAndId(userId, runningAttempt).orElseThrow().status());
                 boolean finished = false;
                 for (int check = 0; check < 100; check++) {
-                    finished = jobs.find(userId, queuedJob).orElseThrow().getStatus().equals("SUCCEEDED")
-                            && attempts.findAttempt(userId, queuedAttempt).orElseThrow().status().equals("GRADED");
+                    finished = jobs.findByUserIdAndId(userId, queuedJob).orElseThrow().getStatus().equals("SUCCEEDED")
+                            && attempts.findByUserIdAndId(userId, queuedAttempt).orElseThrow().status().equals("GRADED");
                     if (finished) {
                         break;
                     }
                     Thread.sleep(100);
                 }
                 assertTrue(finished, "Saved queued work did not finish after restart.");
-                assertEquals(10, attempts.findAttempt(userId, queuedAttempt).orElseThrow().xpAwarded());
+                assertEquals(10, attempts.findByUserIdAndId(userId, queuedAttempt).orElseThrow().xpAwarded());
                 assertEquals(3, jdbc.queryForObject("SELECT COUNT(*) FROM generated_courses WHERE user_id = ?",
                         Integer.class, userId));
-                assertEquals("mostly correct", attempts.findAttempt(userId, runningAttempt).orElseThrow().answer());
+                assertEquals("mostly correct", attempts.findByUserIdAndId(userId, runningAttempt).orElseThrow().answer());
                 restarted.getBean(ProfileService.class).deleteAccount(userId, "synthetic-restart-password");
             }
         } finally {

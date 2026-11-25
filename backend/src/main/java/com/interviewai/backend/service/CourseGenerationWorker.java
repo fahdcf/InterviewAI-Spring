@@ -33,12 +33,12 @@ public class CourseGenerationWorker {
 
     @Scheduled(fixedDelay = 1000)
     public void processNextJob() {
-        jobs.nextQueued().ifPresent(this::generate);
+        jobs.findFirstByStatusOrderByIdAsc("QUEUED").ifPresent(this::generate);
     }
 
     private void generate(CourseJob job) {
         long id = job.getId();
-        if (!jobs.start(id)) {
+        if (jobs.start(id) != 1) {
             return;
         }
         try {

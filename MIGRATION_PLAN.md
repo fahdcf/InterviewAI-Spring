@@ -26,6 +26,8 @@ The earlier review compiled all 83 Java source files with JDK 21. Maven found no
 
 ## 2. Architecture decisions
 
+These decisions describe the original JavaFX and Spring Boot migration. See the [persistence architecture](docs/persistence.md) for the subsequent move to Spring Data JPA.
+
 | Area | Planned approach | Purpose |
 | --- | --- | --- |
 | Repository | One new repository with `backend` and `desktop` Maven modules | Keep related changes reviewable while building each app independently |

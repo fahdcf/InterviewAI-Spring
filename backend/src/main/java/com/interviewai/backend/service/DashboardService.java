@@ -5,15 +5,20 @@ import com.interviewai.backend.dto.response.ChapterSummary;
 import com.interviewai.backend.dto.response.CoursePair;
 import com.interviewai.backend.dto.response.CourseSummary;
 import com.interviewai.backend.dto.response.DashboardResponse;
+import com.interviewai.backend.model.entity.UserAccount;
+import com.interviewai.backend.repository.AccountRepository;
+import com.interviewai.backend.repository.ChapterRepository;
 import com.interviewai.backend.repository.CourseRepository;
-import com.interviewai.backend.repository.DashboardRepository;
+import com.interviewai.backend.repository.InterviewPrepRepository;
+import com.interviewai.backend.repository.ProgressRepository;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
-import java.time.LocalDate;
 import java.time.Clock;
+import java.time.LocalDate;
+import java.time.ZoneOffset;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -22,28 +27,37 @@ import java.util.Set;
 public class DashboardService {
 
     private final CourseRepository courses;
-    private final DashboardRepository dashboard;
+    private final AccountRepository accounts;
+    private final ChapterRepository chapters;
+    private final InterviewPrepRepository pairs;
+    private final ProgressRepository progress;
     private final Clock clock;
 
-    public DashboardService(CourseRepository courses, DashboardRepository dashboard, Clock clock) {
+    public DashboardService(CourseRepository courses, AccountRepository accounts, ChapterRepository chapters,
+            InterviewPrepRepository pairs, ProgressRepository progress, Clock clock) {
         this.courses = courses;
-        this.dashboard = dashboard;
+        this.accounts = accounts;
+        this.chapters = chapters;
+        this.pairs = pairs;
+        this.progress = progress;
         this.clock = clock;
     }
 
     @Transactional(readOnly = true)
     public DashboardResponse load(int userId) {
         List<CourseSummary> available = courses.findAvailableCourses(userId);
-        List<CoursePair> pairs = courses.findPairs(userId);
-        NavigationRequest saved = dashboard.findLocation(userId);
+        List<CoursePair> availablePairs = pairs.findByUserIdOrderByCreatedAtDescIdDesc(userId).stream()
+                .map(pair -> new CoursePair(pair.getId(), pair.getTechnicalCourseId(), pair.getSoftSkillsCourseId()))
+                .toList();
+        UserAccount saved = accounts.findById(userId).orElseThrow();
 
-        Integer courseId = findActiveCourse(available, pairs, saved.getCourseId());
-        List<ChapterSummary> chapters = courseId == null ? List.of() : courses.findChapters(courseId);
+        Integer courseId = findActiveCourse(available, availablePairs, saved.getLastCourseId());
+        List<ChapterSummary> chapters = courseId == null ? List.of() : readChapters(courseId);
         Integer chapterId = findActiveChapter(chapters,
-                courseId != null && courseId.equals(saved.getCourseId()) ? saved.getChapterId() : null);
-        return new DashboardResponse(available, pairs, courseId, chapterId, chapters,
-                dashboard.findTotalXp(userId),
-                calculateStreak(dashboard.findActivityDates(userId, clock.getZone()), LocalDate.now(clock)));
+                courseId != null && courseId.equals(saved.getLastCourseId()) ? saved.getLastChapterId() : null);
+        return new DashboardResponse(available, availablePairs, courseId, chapterId, chapters,
+                progress.findTotalXp(userId),
+                calculateStreak(activityDates(userId, progress, clock), LocalDate.now(clock)));
     }
 
     public List<CourseSummary> listCourses(int userId) {
@@ -58,7 +72,7 @@ public class DashboardService {
     @Transactional(readOnly = true)
     public List<ChapterSummary> listChapters(int userId, int courseId) {
         getCourse(userId, courseId);
-        return courses.findChapters(courseId);
+        return readChapters(courseId);
     }
 
     @Transactional
@@ -69,7 +83,20 @@ public class DashboardService {
         if (chapterId != null && chapters.stream().noneMatch(chapter -> chapter.getId() == chapterId)) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Chapter unavailable for this course.");
         }
-        dashboard.saveLocation(userId, courseId, chapterId);
+        accounts.saveLocation(userId, courseId, chapterId);
+    }
+
+    private List<ChapterSummary> readChapters(int courseId) {
+        return chapters.findChapters(courseId).stream()
+                .map(chapter -> new ChapterSummary(chapter.getId(), chapter.getNumber(), chapter.getName(),
+                        chapter.getDescription(), chapter.getStatus(), chapter.getQuestionCount(), chapter.getAnsweredCount()))
+                .toList();
+    }
+
+    static List<LocalDate> activityDates(int userId, ProgressRepository progress, Clock clock) {
+        return progress.findActivityTimes(userId).stream()
+                .map(time -> time.atOffset(ZoneOffset.UTC).atZoneSameInstant(clock.getZone()).toLocalDate())
+                .distinct().toList();
     }
 
     private Integer findActiveCourse(List<CourseSummary> available, List<CoursePair> pairs, Integer savedId) {

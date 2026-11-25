@@ -1,53 +1,48 @@
 package com.interviewai.backend.repository;
 
-import com.interviewai.backend.dto.request.OnboardingRequest;
 import com.interviewai.backend.dto.response.OnboardingResponse;
-import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.stereotype.Repository;
+import com.interviewai.backend.model.entity.OnboardingData;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
 
+import java.util.List;
 import java.util.Optional;
 
-@Repository
-public class OnboardingRepository {
+public interface OnboardingRepository extends JpaRepository<OnboardingData, Integer> {
 
-    private final JdbcTemplate jdbc;
+    @Query("""
+            select new com.interviewai.backend.dto.response.OnboardingResponse(
+                o.interviewType, o.language, o.timeline, o.context, o.description,
+                case when cv.userId is not null then true else false end)
+            from OnboardingData o left join OnboardingCv cv on cv.userId = o.userId
+            where o.userId = :userId
+            """)
+    Optional<OnboardingResponse> find(int userId);
 
-    public OnboardingRepository(JdbcTemplate jdbc) {
-        this.jdbc = jdbc;
-    }
+    @Modifying
+    @Query(value = """
+            INSERT INTO onboarding_data (user_id, interview_type, language, timeline, context, description)
+            VALUES (:userId, :type, :language, :timeline, :context, :description)
+            ON DUPLICATE KEY UPDATE interview_type = :type, language = :language, timeline = :timeline,
+                context = :context, description = :description
+            """, nativeQuery = true)
+    void savePreferences(int userId, String type, String language, String timeline, String context, String description);
 
-    public Optional<OnboardingResponse> find(int userId) {
-        return jdbc.query("""
-                SELECT o.interview_type, o.language, o.timeline, o.context, o.description, cv.user_id AS cv_owner
-                FROM onboarding_data o LEFT JOIN onboarding_cv cv ON cv.user_id = o.user_id
-                WHERE o.user_id = ?
-                """, (row, index) -> new OnboardingResponse(row.getString("interview_type"),
-                row.getString("language"), row.getString("timeline"), row.getString("context"),
-                row.getString("description"), row.getObject("cv_owner") != null), userId).stream().findFirst();
-    }
+    @Query("""
+            select o.interviewType as label, count(o) as total from OnboardingData o
+            group by o.interviewType order by o.interviewType
+            """)
+    List<CategoryCount> countInterviewTypes();
 
-    public void save(int userId, OnboardingRequest request) {
-        String type = request.getInterviewType();
-        String language = request.getLanguage();
-        String timeline = request.getTimeline();
-        String context = request.getContext().strip();
-        String description = request.getDescription();
-        jdbc.update("""
-                INSERT INTO onboarding_data (user_id, interview_type, language, timeline, context, description)
-                VALUES (?, ?, ?, ?, ?, ?)
-                ON DUPLICATE KEY UPDATE interview_type = ?, language = ?, timeline = ?, context = ?, description = ?
-                """, userId, type, language, timeline, context, description,
-                type, language, timeline, context, description);
-    }
+    @Query("""
+            select o.language as label, count(o) as total from OnboardingData o
+            group by o.language order by o.language
+            """)
+    List<CategoryCount> countLanguages();
 
-    public void saveCv(int userId, String text) {
-        jdbc.update("""
-                INSERT INTO onboarding_cv (user_id, extracted_text) VALUES (?, ?)
-                ON DUPLICATE KEY UPDATE extracted_text = ?
-                """, userId, text, text);
-    }
-
-    public void removeCv(int userId) {
-        jdbc.update("DELETE FROM onboarding_cv WHERE user_id = ?", userId);
+    interface CategoryCount {
+        String getLabel();
+        long getTotal();
     }
 }

@@ -3,6 +3,9 @@ package com.interviewai.backend.service;
 import com.interviewai.backend.dto.response.AccountResponse;
 import com.interviewai.backend.model.Account;
 import com.interviewai.backend.repository.AccountRepository;
+import com.interviewai.backend.repository.CourseRepository;
+import com.interviewai.backend.repository.FeedbackRepository;
+import com.interviewai.backend.repository.ProgressRepository;
 import com.interviewai.backend.security.AccountPasswordEncoder;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -15,11 +18,18 @@ public class ProfileService {
     private final AccountRepository repository;
     private final AccountService accounts;
     private final AccountPasswordEncoder passwords;
+    private final ProgressRepository progress;
+    private final FeedbackRepository feedback;
+    private final CourseRepository courses;
 
-    public ProfileService(AccountRepository repository, AccountService accounts, AccountPasswordEncoder passwords) {
+    public ProfileService(AccountRepository repository, AccountService accounts, AccountPasswordEncoder passwords,
+            ProgressRepository progress, FeedbackRepository feedback, CourseRepository courses) {
         this.repository = repository;
         this.accounts = accounts;
         this.passwords = passwords;
+        this.progress = progress;
+        this.feedback = feedback;
+        this.courses = courses;
     }
 
     @Transactional
@@ -44,12 +54,15 @@ public class ProfileService {
         if (accounts.getActiveAccount(userId).isAdministrator()) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Administrator account deletion is unavailable.");
         }
-        repository.deleteAccount(userId);
+        progress.deleteForUser(userId);
+        feedback.deleteByUserOrOwnedCourse(userId);
+        courses.deleteByOwner(userId);
+        repository.deleteById(userId);
     }
 
     private void verifyPassword(int userId, String password) {
         accounts.lockActiveAccount(userId);
-        Account account = repository.findById(userId).orElseThrow();
+        Account account = repository.findAccount(userId).orElseThrow();
         if (!passwords.matches(password, account.getPasswordHash())) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "The current password is incorrect.");
         }

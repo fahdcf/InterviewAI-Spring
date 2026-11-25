@@ -3,8 +3,12 @@ package com.interviewai.backend.service;
 import com.interviewai.backend.dto.response.QuestResponse;
 import com.interviewai.backend.dto.response.CourseSummary;
 import com.interviewai.backend.repository.CourseRepository;
-import com.interviewai.backend.repository.PracticeRepository;
+import com.interviewai.backend.model.entity.ProgressEvent;
+import com.interviewai.backend.model.entity.QuestClaimRecord;
+import com.interviewai.backend.repository.AccountRepository;
+import com.interviewai.backend.repository.ChapterRepository;
 import com.interviewai.backend.repository.ProgressRepository;
+import com.interviewai.backend.repository.QuestionRepository;
 import com.interviewai.backend.repository.QuestRepository;
 import com.interviewai.backend.repository.QuestRepository.QuestClaim;
 import org.springframework.http.HttpStatus;
@@ -23,16 +27,20 @@ import java.util.List;
 public class QuestService {
 
     private final QuestRepository quests;
-    private final ProgressRepository progress;
+    private final AccountRepository users;
+    private final QuestionRepository questions;
+    private final ChapterRepository chapters;
     private final CourseRepository courses;
-    private final PracticeRepository xp;
+    private final ProgressRepository xp;
     private final AccountService accounts;
     private final Clock clock;
 
-    public QuestService(QuestRepository quests, ProgressRepository progress, CourseRepository courses,
-            PracticeRepository xp, AccountService accounts, Clock clock) {
+    public QuestService(QuestRepository quests, AccountRepository users, QuestionRepository questions, ChapterRepository chapters,
+            CourseRepository courses, ProgressRepository xp, AccountService accounts, Clock clock) {
         this.quests = quests;
-        this.progress = progress;
+        this.users = users;
+        this.questions = questions;
+        this.chapters = chapters;
         this.courses = courses;
         this.xp = xp;
         this.accounts = accounts;
@@ -51,7 +59,7 @@ public class QuestService {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Quest unavailable.");
         }
         accounts.lockActiveAccount(userId);
-        QuestClaim previous = quests.previousClaim(userId, requestId).orElse(null);
+        QuestClaim previous = quests.findByUserIdAndRequestId(userId, requestId).orElse(null);
         if (previous != null) {
             if (!previous.type().equals(type)) {
                 throw new ResponseStatusException(HttpStatus.CONFLICT, "This request ID belongs to another quest.");
@@ -69,31 +77,33 @@ public class QuestService {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "You need an active course to receive XP.");
         }
         if ("daily".equals(type)) {
-            quests.recordDailyReset(userId, today, now);
+            users.recordDailyReset(userId, today, now);
         } else {
-            quests.recordMonthlyClaim(userId, today);
+            users.recordMonthlyClaim(userId, today);
         }
-        xp.awardXp(userId, available.getFirst().getId(), quest.reward());
-        quests.saveClaim(userId, requestId, type, quest.reward());
+        xp.save(new ProgressEvent(userId, available.getFirst().getId(), quest.reward()));
+        quests.save(new QuestClaimRecord(userId, requestId, type, quest.reward()));
         return new QuestClaim(type, quest.reward());
     }
 
     private QuestResponse daily(int userId, LocalDate today) {
         LocalDateTime start = utcStart(today).minusSeconds(1);
-        LocalDateTime lastReset = quests.dailyReset(userId);
+        LocalDateTime lastReset = users.dailyReset(userId);
         if (lastReset != null && lastReset.isAfter(start)) {
             start = lastReset;
         }
-        int answered = quests.answeredSince(userId, start);
+        int answered = questions.countByChapterCourseUserIdAndStatusInAndUpdatedAtAfter(
+                userId, List.of("COMPLETED", "INCORRECT", "IN_PROGRESS"), start);
         return new QuestResponse("daily", answered, 20, 900, false, answered >= 20,
                 today.plusDays(1).atStartOfDay(clock.getZone()).toOffsetDateTime().toString());
     }
 
     private QuestResponse monthly(int userId, LocalDate today) {
         YearMonth month = YearMonth.from(today);
-        LocalDate claimedDate = quests.monthlyClaimDate(userId);
+        LocalDate claimedDate = users.monthlyClaimDate(userId);
         boolean claimed = claimedDate != null && month.equals(YearMonth.from(claimedDate));
-        int completed = progress.completedChapters(userId, utcStart(month.atDay(1)));
+        int completed = chapters.countByCourseUserIdAndStatusAndCompletedAtGreaterThanEqual(
+                userId, "COMPLETED", utcStart(month.atDay(1)));
         return new QuestResponse("monthly", completed, 12, 30000, claimed, !claimed && completed >= 12,
                 month.plusMonths(1).atDay(1).atStartOfDay(clock.getZone()).toOffsetDateTime().toString());
     }

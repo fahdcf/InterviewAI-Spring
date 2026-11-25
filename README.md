@@ -26,7 +26,7 @@ Open a lesson from a selected chapter to practice multiple-choice and short-answ
 
 Administrators can review usage and sign-up trends, filter users and courses, manage user access, reset XP or lesson progress, and archive or delete courses. Spring Security checks permissions on each administrative endpoint.
 
-- `backend/` contains the Spring Boot controllers, account service, JDBC repository, security configuration and Flyway migrations.
+- `backend/` contains the Spring Boot controllers, services, Spring Data JPA repositories, security configuration and Flyway migrations. [Persistence architecture](docs/persistence.md)
 - `desktop/` contains the JavaFX screens, controllers and HTTP client.
 - The `legacy-baseline` tag identifies the complete original source snapshot. See the [migration plan](MIGRATION_PLAN.md) and [legacy acceptance checklist](docs/legacy-acceptance.md).
 

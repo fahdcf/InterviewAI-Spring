@@ -33,11 +33,11 @@ public class AnswerGradingWorker {
 
     @Scheduled(fixedDelay = 750)
     public void processNextAttempt() {
-        attempts.nextQueued().ifPresent(this::grade);
+        attempts.findFirstByStatusOrderByIdAsc("QUEUED").ifPresent(this::grade);
     }
 
     private void grade(PracticeAttempt attempt) {
-        if (!attempts.start(attempt.id())) {
+        if (attempts.start(attempt.id()) != 1) {
             return;
         }
         try {

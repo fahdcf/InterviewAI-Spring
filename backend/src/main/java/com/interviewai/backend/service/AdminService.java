@@ -4,8 +4,21 @@ import com.interviewai.backend.dto.response.AdminCourse;
 import com.interviewai.backend.dto.response.AdminOverview;
 import com.interviewai.backend.dto.response.AdminPage;
 import com.interviewai.backend.dto.response.AdminUser;
-import com.interviewai.backend.repository.AdminRepository;
+import com.interviewai.backend.model.entity.UserAccount;
+import com.interviewai.backend.repository.AccountRepository;
+import com.interviewai.backend.repository.ChapterRepository;
+import com.interviewai.backend.repository.CourseRepository;
+import com.interviewai.backend.repository.DailyCount;
+import com.interviewai.backend.repository.FeedbackRepository;
+import com.interviewai.backend.repository.GoalRepository;
+import com.interviewai.backend.repository.OnboardingRepository;
+import com.interviewai.backend.repository.PracticeRepository;
+import com.interviewai.backend.repository.ProgressRepository;
+import com.interviewai.backend.repository.QuestionRepository;
+import com.interviewai.backend.repository.RoleRepository;
 import com.interviewai.backend.security.AccountPrincipal;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -15,73 +28,126 @@ import java.time.Clock;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
+import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeFormatterBuilder;
+import java.time.temporal.ChronoField;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Locale;
 
 @Service
 public class AdminService {
 
-    private final AdminRepository admin;
+    private static final int PAGE_SIZE = 20;
+    private static final DateTimeFormatter DATE_TIME = new DateTimeFormatterBuilder()
+            .appendPattern("uuuu-MM-dd HH:mm:ss")
+            .appendFraction(ChronoField.NANO_OF_SECOND, 0, 9, true)
+            .toFormatter();
+
+    private final AccountRepository accounts;
+    private final RoleRepository roles;
+    private final CourseRepository courses;
+    private final ChapterRepository chapters;
+    private final QuestionRepository questions;
+    private final ProgressRepository progress;
+    private final PracticeRepository attempts;
+    private final GoalRepository goals;
+    private final FeedbackRepository feedback;
+    private final OnboardingRepository onboarding;
     private final Clock clock;
 
-    public AdminService(AdminRepository admin, Clock clock) {
-        this.admin = admin;
+    public AdminService(AccountRepository accounts, RoleRepository roles, CourseRepository courses,
+            ChapterRepository chapters, QuestionRepository questions, ProgressRepository progress,
+            PracticeRepository attempts, GoalRepository goals, FeedbackRepository feedback,
+            OnboardingRepository onboarding, Clock clock) {
+        this.accounts = accounts;
+        this.roles = roles;
+        this.courses = courses;
+        this.chapters = chapters;
+        this.questions = questions;
+        this.progress = progress;
+        this.attempts = attempts;
+        this.goals = goals;
+        this.feedback = feedback;
+        this.onboarding = onboarding;
         this.clock = clock;
     }
 
     public AdminPage<AdminUser> users(String search, String status, String role, int page) {
         validatePage(page);
         validateStatus(status, "ACTIVE", "SUSPENDED");
-        return admin.users(searchPattern(search), status, role, page);
+        Page<AccountRepository.UserSummary> result =
+                accounts.findAdminUsers(searchPattern(search), status, role, PageRequest.of(page, PAGE_SIZE));
+        if (result.isEmpty()) {
+            return new AdminPage<>(List.of(), page, (int) result.getTotalElements());
+        }
+        List<Integer> ids = result.getContent().stream().map(AccountRepository.UserSummary::getId).toList();
+        Map<Integer, List<String>> rolesByUser = new LinkedHashMap<>();
+        for (AccountRepository.UserRole userRole : accounts.findRolesForUsers(ids)) {
+            rolesByUser.computeIfAbsent(userRole.getUserId(), id -> new ArrayList<>()).add(userRole.getRole());
+        }
+        List<AdminUser> users = result.getContent().stream()
+                .map(row -> toAdminUser(row, rolesByUser.getOrDefault(row.getId(), List.of())))
+                .toList();
+        return new AdminPage<>(users, page, (int) result.getTotalElements());
     }
 
     public AdminUser user(int id) {
-        return admin.user(id)
+        return accounts.findAdminUser(id)
+                .map(summary -> toAdminUser(summary, accounts.findRoles(id)))
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User unavailable."));
     }
 
     public List<String> roles() {
-        return admin.roles();
+        return roles.findNames();
     }
 
     @Transactional
     public void editUser(AccountPrincipal actor, int id, String email, String role, Boolean active) {
-        AdminUser current = lockManagedUser(actor, id);
+        UserAccount current = lockManagedUser(actor, id);
         if (actor.getUserId() == id && (Boolean.FALSE.equals(active) || role != null)) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Change your own access from another administrator account.");
         }
-        if (role != null && (!isSuperAdmin(actor) && !"CANDIDATE".equals(role) || !admin.roles().contains(role))) {
+        if (role != null && (!isSuperAdmin(actor) && !"CANDIDATE".equals(role) || !roles.findNames().contains(role))) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "You cannot assign this role.");
         }
         if (email != null) {
-            admin.setEmail(id, email.isBlank() ? null : email);
+            current.setEmail(email.isBlank() ? null : email);
         }
-        if (role != null && !current.roles().equals(List.of(role))) {
-            admin.assignRole(id, role);
+        if (role != null && !accounts.findRoles(id).equals(List.of(role))) {
+            current.assignRole(roles.findByName(role).orElseThrow(() -> new IllegalArgumentException("Unknown role.")));
         }
-        if (active != null && active != current.active()) {
-            admin.setActive(id, active);
+        if (active != null && active != current.isActive()) {
+            current.changeActive(active);
         }
     }
 
     @Transactional
     public void reset(AccountPrincipal actor, int id, boolean allProgress) {
         lockManagedUser(actor, id);
+        progress.resetXp(id);
         if (allProgress) {
-            admin.resetProgress(id);
-        } else {
-            admin.resetXp(id);
+            chapters.resetProgress(id);
+            questions.resetProgress(id);
+            courses.reopenCompleted(id);
+            attempts.deleteForUser(id);
+            goals.resetProgress(id);
         }
     }
 
     public AdminPage<AdminCourse> courses(String search, String status, int page) {
         validatePage(page);
         validateStatus(status, "ACTIVE", "ARCHIVED", "COMPLETED");
-        return admin.courses(searchPattern(search), status, page);
+        Page<CourseRepository.CourseDetails> result =
+                courses.findAdminCourses(searchPattern(search), status, PageRequest.of(page, PAGE_SIZE));
+        return new AdminPage<>(result.stream().map(AdminService::toAdminCourse).toList(),
+                page, (int) result.getTotalElements());
     }
 
     public AdminCourse course(int id) {
-        return admin.course(id)
+        return courses.findAdminCourse(id).map(AdminService::toAdminCourse)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Course unavailable."));
     }
 
@@ -92,15 +158,16 @@ public class AdminService {
         }
         validateStatus(status, "ACTIVE", "ARCHIVED", "COMPLETED");
         AdminCourse current = course(id);
-        admin.lockUser(current.userId());
-        admin.setCourseStatus(id, status);
+        accounts.lockById(current.userId());
+        courses.setCourseStatus(id, status);
     }
 
     @Transactional
     public void deleteCourse(int id) {
         AdminCourse current = course(id);
-        admin.lockUser(current.userId());
-        admin.deleteCourse(id);
+        accounts.lockById(current.userId());
+        feedback.deleteForCourse(id);
+        courses.deleteCourse(id);
     }
 
     @Transactional(readOnly = true)
@@ -109,18 +176,52 @@ public class AdminService {
         LocalDateTime daily = utcStart(today);
         LocalDateTime weekly = utcStart(today.minusDays(6));
         LocalDateTime monthly = utcStart(today.withDayOfMonth(1));
-        return admin.overview(daily, weekly, monthly);
+        return new AdminOverview((int) accounts.count(), accounts.countByActiveTrue(),
+                accounts.countByCreatedAtGreaterThanEqual(daily), accounts.countByCreatedAtGreaterThanEqual(weekly),
+                accounts.countByCreatedAtGreaterThanEqual(monthly), (int) courses.count(),
+                courses.countByStatus("COMPLETED"), chapters.countByStatus("COMPLETED"), (int) questions.count(),
+                questions.countByStatusIn(List.of("COMPLETED", "INCORRECT")), progress.averageXp(),
+                categories(onboarding.countInterviewTypes()), categories(onboarding.countLanguages()),
+                dailyCounts(accounts.countNewAccounts(weekly)), dailyCounts(progress.countDailyUsage(weekly)));
     }
 
-    private AdminUser lockManagedUser(AccountPrincipal actor, int id) {
-        if (!admin.lockUser(id)) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "User unavailable.");
-        }
-        AdminUser target = user(id);
-        if (!isSuperAdmin(actor) && target.roles().stream().anyMatch(role -> !"CANDIDATE".equals(role))) {
+    private UserAccount lockManagedUser(AccountPrincipal actor, int id) {
+        UserAccount target = accounts.lockById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User unavailable."));
+        if (!isSuperAdmin(actor) && accounts.findRoles(id).stream().anyMatch(role -> !"CANDIDATE".equals(role))) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "You cannot manage this staff account.");
         }
         return target;
+    }
+
+    private static AdminUser toAdminUser(AccountRepository.UserSummary row, List<String> roles) {
+        return new AdminUser(row.getId(), row.getUsername(), row.getEmail(), Boolean.TRUE.equals(row.getActive()),
+                row.getXp(), row.getCourseCount(), formatDateTime(row.getCreatedAt()), roles);
+    }
+
+    private static AdminCourse toAdminCourse(CourseRepository.CourseDetails row) {
+        return new AdminCourse(row.getId(), row.getUserId(), row.getOwner(), row.getTitle(), row.getStatus(),
+                row.getChapterCount(), row.getCompleted(), row.getQuestionCount(), formatDateTime(row.getCreatedAt()));
+    }
+
+    private static String formatDateTime(LocalDateTime value) {
+        return value == null ? null : DATE_TIME.format(value);
+    }
+
+    private static Map<String, Long> categories(List<OnboardingRepository.CategoryCount> rows) {
+        Map<String, Long> counts = new LinkedHashMap<>();
+        for (OnboardingRepository.CategoryCount row : rows) {
+            counts.put(row.getLabel(), row.getTotal());
+        }
+        return counts;
+    }
+
+    private static Map<String, Long> dailyCounts(List<DailyCount> rows) {
+        Map<String, Long> counts = new LinkedHashMap<>();
+        for (DailyCount row : rows) {
+            counts.put(row.getDay().toString(), row.getTotal());
+        }
+        return counts;
     }
 
     private boolean isSuperAdmin(AccountPrincipal actor) {
